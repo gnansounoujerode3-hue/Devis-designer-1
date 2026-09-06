@@ -100,10 +100,31 @@ Client                Worker Cloudflare              Chariow
    - **Automations → Pulses** : créez un Pulse vers
      `https://VOTRE-WORKER.workers.dev/webhook` (événements de vente),
      puis copiez son **secret de signature** (`whsec_...`)
+### Endpoints du Worker
+
+| Route | Rôle |
+|---|---|
+| `POST /checkout`, `POST /check`, `POST /webhook` | Paiement automatique Chariow (création, suivi, Pulse) |
+| `POST /validate` | Vérification / anti-rejeu d'un code |
+| `POST /export` | Compteur d'exports par installation (`used:<deviceId>`) |
+| `POST /referral/register` | Déclare une installation (+ son code parrain) : le 1ᵉʳ parrain enregistré gagne, jamais écrasé |
+| `POST /referral/export` | Signale un export du filleul → valide le parrainage et **émet** le code récompense (1 par filleul, plafond 12 mois/an par parrain) |
+| `POST /referral/status` | Relit l'état d'une installation (réinstall, stockage vidé) |
+| `POST /referral/stats` | Compteurs de parrainage pour l'espace vendeur (`admin` = `ADMIN_PASS`) |
+| `GET /debug` | Diagnostic (secrets, KV, dernier webhook) |
+
+> ⚠️ Ces routes `/*referral*` sont **nouvelles** : redéployez `backend/worker.js`
+> (bouton *Deploy* dans l'éditeur du Worker, ou `npx wrangler deploy`) pour que le
+> parrainage soit piloté par le serveur. Tant que le Worker ne répond pas,
+> l'application continue d'émettre les récompenses **en local** (aucun blocage).
+> Le code généré par le Worker doit être signé avec le **même secret** que l'app :
+> `SECRET_KEYS = {"v1":"<secret encodé de src/lib/license.ts>"}`.
+
 2. **Cloudflare** (gratuit) : Workers & Pages → Create → Worker →
    collez le contenu de `backend/worker.js` → Deploy, puis :
    - Variables : `SECRET_KEYS` (JSON, ex `{"v1":"votre-secret"}`),
-     `ADMIN_PASS`, `CHARIOW_KEY` (clé API `sk_live_...`),
+     `ADMIN_PASS`, `REF_MIN_AGE_HOURS` (optionnel, anti-abus parrainage),
+     `CHARIOW_KEY` (clé API `sk_live_...`),
      `CHARIOW_PULSE_SECRET` (le `whsec_...`),
      `PRODUCT_IDS` = `{"MONTHLY":"prd_...","ANNUAL":"prd_...","DESIGN":"prd_...","ALL":"prd_..."}`
    - Storage → KV : créez un namespace `DD_KV` et liez-le au Worker
@@ -193,7 +214,10 @@ aucune contrepartie, et il n'existe aucun concours ni autre dispositif de mois g
 | **Lien `?ref=`** | `https://votre-app/?ref=DDREF-XXXXXXXX` enregistre automatiquement le code parrain à l'arrivée — le message de partage construit ce lien tout seul à partir de `VENDOR.DOWNLOAD_LINK` (voir `referralDownloadLink()`) |
 | **Saisie manuelle** | Le filleul qui reçoit le code oralement le tape dans l'encart « Un ami vous a parrainé ? » |
 | **Condition de validité** | Le filleul doit avoir **exporté au moins un document** (PDF ou envoi pour signature) |
-| **Récompense** | +1 mois offert **au parrain** : le code remerciement est généré chez le filleul (1 seule fois par installation de filleul), transmis sur WhatsApp, puis collé dans « Déjà abonné ? » |
+| **Récompense** | +1 mois offert **au parrain** : code remerciement transmis sur WhatsApp puis collé dans « Déjà abonné ? » |
+| **Émission par le Worker** | `POST /referral/export` : le serveur compte l'export du filleul, n'émet **qu'une** récompense par installation de filleul et applique le plafond de 12 mois / parrain (12 mois glissants). Repli local automatique si le Worker est injoignable |
+| **Bascule** | `REFERRAL_VIA_WORKER` dans `src/lib/config.ts` (`false` = 100 % hors-ligne) |
+| **Anti-abus optionnel** | variable Worker `REF_MIN_AGE_HOURS` : âge minimal (heures) d'une installation avant que son export valide un parrainage (0 = désactivé) |
 | **Code nominatif** | Le code récompense est lié à l'installation du parrain : refusé ailleurs. Activable 30 jours |
 | **Plafond** | 12 mois offerts maximum sur 12 mois glissants, par parrain |
 | **Bannière quota bas** | ≤ 5 exports gratuits → bandeau d'urgence avec le code parrain et le bouton « Parrainer » |

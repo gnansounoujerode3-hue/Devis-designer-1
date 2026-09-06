@@ -93,11 +93,132 @@ export default {
         return json({ ok: true, used: used + 1 }, 200, cors);
       }
 
+      /* ---- 2bis. PARRAINAGE : enregistrement (installation + code parrain) ---- */
+      if (path === '/referral/register' && request.method === 'POST') {
+        const body = await request.json();
+        const deviceId = normDevice(body.deviceId);
+        if (!deviceId) return json({ ok: false, message: 'Code parrain de cette installation manquant.' }, 400, cors);
+
+        // L'installation est connue : son code parrain peut donc en récompenser d'autres.
+        const devKey = 'refdev:' + deviceId;
+        if (!(await kvGet(env, devKey, null))) await kvPut(env, devKey, { at: Date.now() });
+
+        const out = { ok: true, deviceId, referred: false, validated: false, exports: 0, reward: null, parrainKnown: false };
+        const refCode = normRefCode(body.refCode);
+        if (refCode && refCode !== deviceId) {
+          const key = REF_LINK_KEY + deviceId;
+          let rec = await kvGet(env, key, null);
+          if (!rec) {
+            // 1 filleul = 1 seul parrain : le premier code enregistré gagne, il n'est jamais écrasé.
+            rec = { parrain: refCode, at: Date.now(), exports: 0, validated: false, reward: null };
+            await kvPut(env, key, rec);
+          }
+          out.referred = true;
+          out.validated = !!rec.validated;
+          out.exports = rec.exports || 0;
+          out.reward = rec.reward || null;
+          out.parrainKnown = !!(await kvGet(env, 'refdev:' + rec.parrain, null));
+        }
+        return json(out, 200, cors);
+      }
+
+      /* ---- 2ter. PARRAINAGE : le filleul déclare un export = parrainage valide ---- */
+      if (path === '/referral/export' && request.method === 'POST') {
+        const body = await request.json();
+        const deviceId = normDevice(body.deviceId);
+        if (!deviceId) return json({ ok: false, message: 'Installation inconnue.' }, 400, cors);
+
+        const refCode = normRefCode(body.refCode);
+        const key = REF_LINK_KEY + deviceId;
+        let rec = await kvGet(env, key, null);
+        if (!rec) {
+          if (!refCode || refCode === deviceId) return json({ ok: true, referred: false }, 200, cors);
+          rec = { parrain: refCode, at: Date.now(), exports: 0, validated: false, reward: null };
+        }
+        if (!(await kvGet(env, 'refdev:' + deviceId, null))) await kvPut(env, 'refdev:' + deviceId, { at: Date.now() });
+
+        rec.exports = (rec.exports || 0) + 1;
+        // Le quota d'exports gratuit suit la même source de vérité (le serveur ne peut pas être doublé).
+        const used = await kvGet(env, 'used:' + deviceId, 0);
+        await kvPut(env, 'used:' + deviceId, used + 1);
+
+        if (!rec.validated) {
+          const minAge = referralMinAgeMs(env);
+          if (minAge > 0 && Date.now() - (rec.at || 0) < minAge) {
+            rec.holdUntil = (rec.at || 0) + minAge;
+            await kvPut(env, key, rec);
+            return json({ ok: true, referred: true, validated: false, exports: rec.exports, reward: null, hold: true, holdUntil: rec.holdUntil }, 200, cors);
+          }
+          const granted = await monthsGrantedTo(env, rec.parrain);
+          if (granted + REF_REWARD_MONTHS > REF_MAX_MONTHS_PER_YEAR) {
+            // Parrainage valide, mais le parrain a atteint son plafond annuel : aucune émission.
+            rec.validated = true;
+            rec.reason = 'cap';
+            rec.reward = null;
+            await kvPut(env, key, rec);
+            return json({ ok: true, referred: true, validated: true, exports: rec.exports, reward: null, reason: 'cap', parrainMonths: granted }, 200, cors);
+          }
+          rec.validated = true;
+          rec.reason = null;
+          rec.issuedAt = Date.now();
+          // Code nominatif : lié à l'empreinte du code parrain destinataire.
+          rec.reward = await makeCode('REFERRAL', REF_REWARD_MONTHS, env, rec.parrain);
+          await kvPut(env, key, rec);
+          await addMonthsGranted(env, rec.parrain, REF_REWARD_MONTHS, deviceId);
+          await kvPut(env, 'refissued:' + refFingerprint(rec.reward), deviceId);
+          return json({ ok: true, referred: true, validated: true, exports: rec.exports, reward: rec.reward, parrainMonths: granted + REF_REWARD_MONTHS }, 200, cors);
+        }
+
+        await kvPut(env, key, rec);
+        return json({ ok: true, referred: true, validated: true, exports: rec.exports, reward: rec.reward || null, reason: rec.reason || null }, 200, cors);
+      }
+
+      /* ---- 2quater. PARRAINAGE : etat d'une installation (ressau après réinstall) ---- */
+      if (path === '/referral/status' && request.method === 'POST') {
+        const body = await request.json();
+        const deviceId = normDevice(body.deviceId);
+        if (!deviceId) return json({ ok: false, message: 'Installation inconnue.' }, 400, cors);
+        const rec = await kvGet(env, REF_LINK_KEY + deviceId, null);
+        if (!rec) return json({ ok: true, referred: false }, 200, cors);
+        return json({
+          ok: true, referred: true, parrain: rec.parrain, exports: rec.exports || 0,
+          validated: !!rec.validated, reward: rec.reward || null, reason: rec.reason || null, issuedAt: rec.issuedAt || null,
+        }, 200, cors);
+      }
+
+      /* ---- 2quinq. PARRAINAGE : stats vendeur (mot de passe requis) ---- */
+      if (path === '/referral/stats' && request.method === 'POST') {
+        const body = await request.json();
+        if (body.admin !== getAdminPass(env)) return json({ ok: false, message: 'Non autorise.' }, 401, cors);
+        const out = { ok: true, referred: 0, validated: 0, pending: 0, rewardsIssued: 0, monthsGranted: 0, capBlocked: 0, parrains: 0, truncated: false, top: [] };
+        try {
+          const listed = await env.DD_KV.list({ prefix: REF_LINK_KEY, limit: 1000 });
+          const keys = (listed.keys || []).slice(0, 500);
+          if ((listed.keys || []).length >= 1000) out.truncated = true;
+          const perParrain = {};
+          for (const k of keys) {
+            const rec = await kvGet(env, k.name, null);
+            if (!rec) continue;
+            out.referred++;
+            if (rec.validated) out.validated++; else out.pending++;
+            if (rec.reward) { out.rewardsIssued++; out.monthsGranted += REF_REWARD_MONTHS; }
+            if (rec.reason === 'cap') out.capBlocked++;
+            perParrain[rec.parrain] = (perParrain[rec.parrain] || 0) + (rec.reward ? 1 : 0);
+          }
+          out.parrains = Object.keys(perParrain).length;
+          out.top = Object.entries(perParrain).sort((a, b) => b[1] - a[1]).slice(0, 5)
+            .map(([code, months]) => ({ code, months }));
+        } catch (e) {
+          out.error = 'KV indisponible : ' + (e && e.message ? String(e.message).slice(0, 80) : 'erreur');
+        }
+        return json(out, 200, cors);
+      }
+
       /* ---- 3. ESPACE VENDEUR : générer un code (avec mot de passe) ---- */
       if (path === '/vendor/gen' && request.method === 'POST') {
         const body = await request.json();
         if (body.admin !== getAdminPass(env)) return json({ ok: false, message: 'Non autorise.' }, 401, cors);
-        const code = await makeCode(body.kind, body.months || 1, env);
+        const code = await makeCode(body.kind, body.months || 1, env, body.to);
         return json({ ok: true, code }, 200, cors);
       }
 
@@ -336,6 +457,59 @@ export default {
   },
 };
 
+/* ---------------- PARRAINAGE (politique unique de mois offerts) ----------------
+   1 parrainage valide (1er export du filleul) = 1 mois offert AU PARRAIN.
+   Le serveur est la source de verite : 1 seule recompense par installation de
+   filleul, plafond annuel de 12 mois par parrain, codes nominatifs.
+   Ces constantes doivent rester identiques a celles de src/lib/license.ts. */
+
+const REF_REWARD_MONTHS = 1;
+const REF_MAX_MONTHS_PER_YEAR = 12;
+const REF_LINK_KEY = 'ref:';
+const REF_MONTHS_KEY = 'refmonths:';
+const REF_YEAR_MS = 365 * 86400000;
+const REF_CODE_RE = /^DDREF-[A-Z0-9]{4,}$/;
+
+function normDevice(v) {
+  const s = String(v || '').trim().toUpperCase();
+  return REF_CODE_RE.test(s) ? s : '';
+}
+function normRefCode(v) {
+  const s = String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+  return REF_CODE_RE.test(s) ? s : '';
+}
+
+/** Empreinte courte du code parrain — ALGORITHME IDENTIQUE a refFingerprint() de l'app. */
+function refFingerprint(code) {
+  const s = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36).toUpperCase().padStart(7, '0').slice(-7);
+}
+
+/** Anti-abus optionnel : age minimal d'une installation avant que son export valide un parrainage. */
+function referralMinAgeMs(env) {
+  const h = parseFloat(envGet(env, 'REF_MIN_AGE_HOURS') || '0');
+  return (isFinite(h) && h > 0) ? h * 3600000 : 0;
+}
+
+/** Mois deja offerts a un parrain sur 12 mois glissants (compteur serveur). */
+async function monthsGrantedTo(env, parrainCode) {
+  const rec = await kvGet(env, REF_MONTHS_KEY + parrainCode, null);
+  if (!rec || !Array.isArray(rec.entries)) return 0;
+  const now = Date.now();
+  return rec.entries.filter(e => now - e.at <= REF_YEAR_MS).reduce((sum, e) => sum + (e.months || 0), 0);
+}
+
+async function addMonthsGranted(env, parrainCode, months, filleul) {
+  const rec = (await kvGet(env, REF_MONTHS_KEY + parrainCode, null)) || { entries: [] };
+  const now = Date.now();
+  rec.entries = (rec.entries || []).filter(e => now - e.at <= REF_YEAR_MS);
+  rec.entries.unshift({ at: now, months, filleul: filleul || null });
+  rec.entries = rec.entries.slice(0, 100);
+  await kvPut(env, REF_MONTHS_KEY + parrainCode, rec);
+}
+
 /* ---------------- Utilitaires ---------------- */
 
 function json(obj, status, cors) {
@@ -441,9 +615,16 @@ async function verifyCode(code, env) {
 
 /* ---------------- Génération d'un code (vendeur / paiement) ---------------- */
 
-async function makeCode(kind, months, env) {
+async function makeCode(kind, months, env, bindTo) {
   const timed = kind === 'MONTHLY' || kind === 'REFERRAL';
-  const payload = { kind, months: timed ? months : undefined, iat: Date.now(), n: Math.random().toString(36).slice(2, 8) };
+  const payload = {
+    kind,
+    months: timed ? months : undefined,
+    iat: Date.now(),
+    n: Math.random().toString(36).slice(2, 8),
+    // empreinte du code parrain destinataire : le code n'est activable que chez lui
+    to: bindTo ? refFingerprint(String(bindTo).toUpperCase()) : undefined,
+  };
   const keys = getSecretKeys(env);
   const secret = Object.values(keys)[Object.keys(keys).length - 1] || 'default-secret';
   const body = b32encode(new TextEncoder().encode(JSON.stringify(payload)));

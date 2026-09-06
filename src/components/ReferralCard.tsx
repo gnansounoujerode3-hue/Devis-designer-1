@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import {
   getMyRefCode, whatsappShareUrl, getParrainCode, saveParrainCode, isReferred,
   getMyRewardCode, rewardWhatsAppUrl, markMyRewardSent, parrainStatusLabel,
-  hasMinimumExport, settleReferralReward,
+  hasMinimumExport, settleReferralReward, controlLabel, getRewardSource,
+  isParrainCapped, isWorkerReferralEnabled,
 } from '../lib/referral';
 import { REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR } from '../lib/license';
 
@@ -66,8 +67,12 @@ export default function ReferralCard() {
         Parrainer un ami sur WhatsApp
       </a>
 
-      {/* Suivi des mois reçus */}
+      {/* Suivi des mois reçus + origine du contrôle */}
       <div className="mt-2 text-[10px] text-[#888] dark:text-zinc-400">{parrainStatusLabel()}</div>
+      <div className="mt-1 flex items-center gap-1.5 text-[9px] text-[#999]">
+        <span className={`w-1.5 h-1.5 rounded-full ${isWorkerReferralEnabled() ? 'bg-emerald-500' : 'bg-[#CCC] dark:bg-zinc-600'}`} />
+        {controlLabel()}
+      </div>
 
       {/* Côté filleul */}
       {referred ? (
@@ -84,6 +89,11 @@ export default function ReferralCard() {
                 <div className="text-[11px] text-[#666] dark:text-zinc-400 mt-2">
                   Parrainage validé : transmettez-lui son code de remerciement
                   (<b>{REF_REWARD_MONTHS} mois offert</b>, activable sous 30 jours).
+                  <span className="block mt-1 text-[9px] text-[#999]">
+                    {getRewardSource() === 'server'
+                      ? 'Code émis et plafonné par le serveur : un seul exemplaire au monde pour ce parrainage.'
+                      : 'Code émis hors-ligne (serveur non joint).'}
+                  </span>
                 </div>
                 <a
                   href={rewardWhatsAppUrl(reward)}
@@ -98,6 +108,12 @@ export default function ReferralCard() {
             )
           ) : (
             <>
+              {isParrainCapped() && (
+                <div className="mb-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 px-2 py-1.5 text-[10px] text-amber-700 dark:text-amber-300">
+                  Votre parrain a déjà reçu {REF_MAX_MONTHS_PER_YEAR} mois offerts sur 12 mois : aucun nouveau mois
+                  ne peut être émis pour lui. Vous pouvez tout de même lui envoyer le lien de l'app.
+                </div>
+              )}
               <div className="text-[11px] text-[#888] mt-1">
                 {hasMinimumExport()
                   ? 'Votre 1er document est exporté : le code de remerciement vient d\'être préparé.'

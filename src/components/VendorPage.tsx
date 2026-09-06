@@ -8,6 +8,7 @@ import {
   REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR,
 } from '../lib/license';
 import { VENDOR, VENDOR_PIN } from '../lib/config';
+import { fetchWorkerReferralStats, isWorkerReferralEnabled, type WorkerReferralStats } from '../lib/referral';
 
 /* ============================================================
    ESPACE VENDEUR — page réservée au propriétaire de l'app
@@ -133,6 +134,18 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
   const [busy, setBusy] = useState(false);
   /** Nombre de mois offerts à créditer au parrain (1 par filleul valide). */
   const [refMonths, setRefMonths] = useState(1);
+  /** Code parrain destinataire : rend le code manuel nominatif (facultatif). */
+  const [bindRef, setBindRef] = useState('');
+  const [wstats, setWstats] = useState<WorkerReferralStats | null>(null);
+  const [wloading, setWloading] = useState(false);
+
+  const loadWorkerStats = async () => {
+    setWloading(true);
+    const r = await fetchWorkerReferralStats(VENDOR_PIN);
+    setWstats(r);
+    setWloading(false);
+  };
+  useEffect(() => { if (isWorkerReferralEnabled()) void loadWorkerStats(); }, []);
 
   const stats = useMemo(() => {
     const now = Date.now();
@@ -161,7 +174,8 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
     setBusy(true);
     try {
       const months = offer.kind === 'REFERRAL' ? clampMonths(refMonths) : (offer.months ?? 1);
-      const c = await generateCode(offer.kind, months);
+      const bind = offer.kind === 'REFERRAL' && /^DDREF-[A-Z0-9]{4,}$/i.test(bindRef.trim()) ? bindRef.trim().toUpperCase() : undefined;
+      const c = await generateCode(offer.kind, months, bind);
       logVendorCode(offer.kind, (offer.kind === 'MONTHLY' || offer.kind === 'REFERRAL') ? months : undefined, c, client, digits(phone) || undefined);
       setLog(getVendorLog());
       setGenCode(c);
@@ -264,9 +278,11 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
           <p className="text-[11px] text-[#666] dark:text-zinc-400 mb-3">
             Politique unique de l'application : <b>1 parrainage = {REF_REWARD_MONTHS} mois gratuit pour le parrain</b>{' '}
             (le filleul ne reçoit rien). Un parrainage est valide quand le filleul a enregistré le code parrain
-            <b> et</b> exporté au moins un document : l'app du filleul génère alors le code de remerciement,
-            lié à l'installation du parrain. Plafond : {REF_MAX_MONTHS_PER_YEAR} mois offerts par an et par parrain.
-            Il n'existe aucun concours ni autre bonus de mois gratuits.
+            <b> et</b> exporté au moins un document. C'est votre <b>Worker</b> qui compte les exports, n'émet
+            qu'une récompense par installation de filleul et applique le plafond de
+            {REF_MAX_MONTHS_PER_YEAR} mois offerts par an et par parrain ; les codes sont nominatifs (liés à
+            l'installation du parrain). En cas d'indisponibilité du serveur, l'application retombe sur une
+            émission locale. Il n'existe aucun concours ni autre bonus de mois gratuits.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 px-3 py-2.5">
@@ -283,10 +299,62 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
             </div>
           </div>
           <p className="text-[10px] text-[#999] mt-2">
-            Ces chiffres couvrent les codes générés depuis cet appareil. Pour créditer un parrain dont le filleul
-            n'a pas pu envoyer le code, sélectionnez l'offre « Parrainage — 1 mois offert » ci-dessous et envoyez-lui
-            le code généré.
+            Chiffres ci-dessus = codes générés depuis cet appareil (crédits manuels).
+            Pour créditer un parrain dont le filleul n'a pas pu envoyer le code, utilisez l'offre
+            « Parrainage — 1 mois offert » ci-dessous.
           </p>
+
+          {/* Vue serveur (Worker) : source de vérité des parrainages */}
+          <div className="mt-3 rounded-xl border border-emerald-200 dark:border-emerald-900 p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="text-[9px] font-black tracking-widest uppercase text-emerald-700 dark:text-emerald-400">
+                SUIVI SERVEUR (WORKER)
+              </div>
+              <button
+                onClick={() => void loadWorkerStats()}
+                disabled={wloading || !isWorkerReferralEnabled()}
+                className="px-2 py-1 rounded-lg border border-[#E0E0E0] dark:border-zinc-700 text-[10px] font-bold text-[#666] dark:text-zinc-300 hover:bg-[#F5F5F5] dark:hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {wloading ? 'Chargement…' : 'Actualiser'}
+              </button>
+            </div>
+            {!isWorkerReferralEnabled() ? (
+              <div className="text-[11px] text-[#999]">
+                Worker non configuré (<code>AUTO_PAY_WORKER_URL</code> vide) : le parrainage fonctionne uniquement
+                hors-ligne, sans suivi centralisé.
+              </div>
+            ) : !wstats ? (
+              <div className="text-[11px] text-[#999]">Aucune donnée reçue du serveur pour l'instant.</div>
+            ) : wstats.ok ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <WStat label="Parrainages suivis" value={String(wstats.referred ?? 0)} />
+                  <WStat label="Validés (1er export)" value={String(wstats.validated ?? 0)} />
+                  <WStat label="Récompenses émises" value={String(wstats.rewardsIssued ?? 0)} sub={`${wstats.monthsGranted ?? 0} mois offerts`} />
+                  <WStat label="Refus (plafond 12 mois)" value={String(wstats.capBlocked ?? 0)} />
+                </div>
+                <div className="text-[10px] text-[#999] mt-2">
+                  {wstats.parrains ?? 0} parrain(s) récompensé(s){wstats.pending ? ` · ${wstats.pending} en attente du 1er export` : ''}
+                  {wstats.truncated ? ' · liste partielle (500 enregistrements analysés)' : ''}
+                  {wstats.error ? ` · ${wstats.error}` : ''}
+                </div>
+                {!!wstats.top?.length && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {wstats.top.map(t => (
+                      <span key={t.code} className="font-mono text-[10px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 rounded-md px-1.5 py-0.5">
+                        {t.code} · {t.months}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-[11px] text-amber-700 dark:text-amber-400">
+                {wstats.message || 'Serveur injoignable.'} — déployez la version récente de{' '}
+                <code>backend/worker.js</code> pour activer le suivi et le plafonnement centralisés.
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Génération de code */}
@@ -331,6 +399,15 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
               />
               <span className="text-[11px] text-emerald-800 dark:text-emerald-300">
                 = {clampMonths(refMonths)} mois offert{clampMonths(refMonths) > 1 ? 's' : ''} pour ce parrain
+              </span>
+              <input
+                value={bindRef}
+                onChange={e => setBindRef(e.target.value.toUpperCase())}
+                placeholder="Code parrain destinataire (DDREF-…) — facultatif"
+                className="ml-auto w-full sm:w-72 px-2 py-1.5 text-[11px] rounded-lg border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-zinc-900 text-[#111] dark:text-white font-mono focus:outline-none"
+              />
+              <span className="text-[9px] text-emerald-800/80 dark:text-emerald-400/80 w-full">
+                Renseignez-le pour rendre le code nominatif : il ne sera activable que sur l'installation de ce parrain.
               </span>
             </div>
           )}
@@ -458,6 +535,17 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
 }
 
 /* ---------------- Carte statistique ---------------- */
+
+/** Carte de statistique du suivi serveur (Worker). */
+function WStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-950 px-2.5 py-2">
+      <div className="text-[9px] font-black tracking-widest uppercase text-[#999] truncate">{label}</div>
+      <div className="text-base font-black text-[#111] dark:text-white mt-0.5">{value}</div>
+      {sub && <div className="text-[9px] font-bold text-[#AAA]">{sub}</div>}
+    </div>
+  );
+}
 
 function StatCard({ title, value, sub, accent }: { title: string; value: string; sub?: string; accent?: boolean }) {
   return (

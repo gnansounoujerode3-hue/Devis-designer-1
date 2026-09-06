@@ -14,7 +14,7 @@ import Onboarding from './components/Onboarding';
 import LegalModal from './components/LegalModal';
 import FAQModal from './components/FAQModal';
 import { loadLicense, isLicensed, canExport, incrementExportCount, remainingFree, restoreExportCountFromBackup, daysLeft } from './lib/license';
-import { saveParrainCode, getMyRefCode, whatsappShareUrl, settleReferralReward } from './lib/referral';
+import { saveParrainCode, getMyRefCode, whatsappShareUrl, settleReferralReward, syncReferralFromWorker } from './lib/referral';
 import { downloadBlob, downloadBackup, importAllData } from './store';
 
 const COLORS = [
@@ -180,7 +180,9 @@ export default function App() {
     } catch { /* ignore */ }
     getMyRefCode();
     // le parrainage est peut-être déjà valide (export fait avant la saisie du code)
-    settleReferralReward().then(() => setReferralTick(t => t + 1));
+    syncReferralFromWorker()
+      .then(() => settleReferralReward())
+      .finally(() => setReferralTick(t => t + 1));
   }, []);
   useEffect(() => { if (page !== 'editor') return; const t = setInterval(() => { saveDoc(data); setDocs(loadAllDocs()); }, 3000); return () => clearInterval(t); }, [data, page]);
   useEffect(() => { const h = (e: MouseEvent) => { if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
@@ -212,6 +214,7 @@ export default function App() {
    * destiné au PARRAIN, puis on rafraîchit l'encart parrainage.
    */
   const notifyReferral = () => {
+    // fait compter l'export par le Worker (puis retombe sur l'émission locale si besoin)
     settleReferralReward().finally(() => setReferralTick(t => t + 1));
   };
   const handleDelete = (id: string) => { deleteDoc(id); setDocs(loadAllDocs()); };

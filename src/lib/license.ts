@@ -287,6 +287,30 @@ export async function generateCode(kind: CodeKind, months = 1, bindTo?: string):
   return 'DD-' + raw.slice(2).match(/.{1,4}/g)!.join('-');
 }
 
+/**
+ * Vérifie la signature d'un code SANS l'activer (et sans le compter dans
+ * l'historique). Sert notamment à contrôler un code de récompense renvoyé par
+ * le Worker avant de le proposer au parrain : un code non signé par le secret
+ * de l'app, expiré ou destiné à un autre parrain est rejeté.
+ */
+export async function inspectCode(input: string): Promise<(CodePayload & { valid: boolean; expiresInDays: number }) | null> {
+  const clean = (input || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!clean.startsWith('DD') || clean.length < 14) return null;
+  const raw = clean.slice(2);
+  const body = raw.slice(0, -10);
+  const sig = raw.slice(-10);
+  const expected = b32encode(hexToBytes(await hmacHex(body, SECRET))).slice(0, 10);
+  if (sig !== expected) return null;
+  let payload: CodePayload;
+  try { payload = JSON.parse(fromUtf8(b32decode(body))); } catch { return null; }
+  if (!payload || typeof payload.kind !== 'string') return null;
+  const age = Date.now() - (payload.iat || 0);
+  return { ...payload, valid: age <= CODE_VALIDITY_MS, expiresInDays: Math.max(0, Math.ceil((CODE_VALIDITY_MS - age) / 86400000)) };
+}
+
+/** Empreinte du code parrain d'une installation (même algorithme que le Worker). */
+export { refFingerprint as referralFingerprint };
+
 /** Valide un code saisi par le client et active la licence correspondante. */
 export async function applyCode(input: string): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
   const clean = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
