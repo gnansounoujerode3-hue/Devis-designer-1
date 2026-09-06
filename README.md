@@ -22,7 +22,8 @@ npm run preview    # prévisualiser le build
 - **Sauvegarde / restauration** JSON (export/import de tous les devis + clients)
 - **Monétisation intégrée** : 20 exports gratuits, abonnements 2000 F/mois, 15 000 F/an,
   design personnalisé 5 000 F, tous les designs 50 000 F/an (activation par codes)
-- **Concours** : partagez votre meilleur devis sur WhatsApp → 3 mois gratuits
+- **Parrainage (seule récompense gratuite)** : 1 parrainage valide = **1 mois offert au parrain**
+  (le filleul ne reçoit rien) — plafond 12 mois/an. Aucun concours, aucun autre bonus de mois gratuits
 - **FAQ, CGU et politique de confidentialité** intégrés (conforme loi n°2017-20 Bénin)
 - **Rappel d'expiration** d'abonnement, carnet de clients, filigrane de statut
 
@@ -56,6 +57,7 @@ devis-designer/
 | Abonnement 1 an | 15 000 F / an | Exports illimités pendant 1 an |
 | Design personnalisé | 5 000 F | Un design sur mesure pour votre template (paiement unique) |
 | TOUS les designs (1 an) | 50 000 F / an | N'importe quel design de template gratuit pendant 1 an + exports illimités |
+| **Parrainage** | 0 F | **1 mois offert au parrain** par parrainage valide (max. 12 mois / 12 mois glissants) |
 
 ### Comment ça marche (sans serveur)
 1. Le client crée ses devis librement. Chaque **export PDF** ou **envoi pour signature** consomme 1 des 20 gratuits.
@@ -130,7 +132,10 @@ https://votre-app.com/#/vendeur
    - **Statistiques** : total encaissé, ventes du mois, codes actifs/expirés, clients uniques,
      ventilation par offre
    - **Génération de codes** : choisir l'offre, saisir le nom + n° WhatsApp du client
-     (optionnel) → le code est généré, copié, et envoyé en 1 clic sur WhatsApp
+     (optionnel) → le code est généré, copié, et envoyé en 1 clic sur WhatsApp.
+     L'offre « Parrainage — 1 mois offert » (0 F) sert à créditer manuellement un parrain
+     (nombre de filleuls récompensés réglable, borné à 12 mois)
+   - **Panneau PARRAINAGE** : rappel de la politique + codes de récompense émis et mois crédités
    - **Historique des ventes** : date, client, offre, prix, code, statut (actif/expiré —
      un code reste activable 30 jours après sa génération), copier / WhatsApp / supprimer
    - **Export CSV** de l'historique pour archiver vos ventes
@@ -175,15 +180,29 @@ npx gh-pages -d dist
 Cloudflare Worker **gratuit** (100k requêtes/jour) : validation des codes côté serveur,
 anti-rejeu, quota par appareil. Voir le fichier pour les instructions de déploiement.
 
-## 🎁 Partage & concours (3 mois gratuits)
+## 🎁 Parrainage — la seule récompense gratuite de l'app
+
+**Politique unique : 1 parrainage = 1 mois gratuit pour le PARRAIN.** Le filleul ne reçoit
+aucune contrepartie, et il n'existe aucun concours ni autre dispositif de mois gratuits
+(l'ancien « concours 3 mois gratuits » et sa popup ont été supprimés de l'application).
 
 | Mécanisme | Détail |
 |---|---|
-| **Code parrain** | Chaque installation a un code unique `DDREF-XXXX` |
-| **Partage WhatsApp 1 clic** | Boutons « Recommander sur WhatsApp » avec message pré-écrit + lien web |
-| **CONCOURS — 3 mois gratuits** | Après un export réussi : 1) publier son meilleur devis sur son statut WhatsApp 2) recommander l'app 3) confirmer → code récompense **+3 mois** (1 seule fois) |
-| **Lien `?ref=`** | `https://votre-app/?ref=DDREF-XXXX` pré-remplit le code parrain à l'arrivée |
-| **Bannière quota bas** | Quand il reste ≤ 5 exports gratuits → bandeau d'urgence avec bouton partager |
+| **Code parrain** | Chaque installation a un code unique `DDREF-XXXXXXXX` (bouton « PRO » → encart PARRAINAGE) |
+| **Partage WhatsApp 1 clic** | Bouton « Parrainer un ami sur WhatsApp » : message pré-écrit + lien + code parrain |
+| **Lien `?ref=`** | `https://votre-app/?ref=DDREF-XXXXXXXX` enregistre automatiquement le code parrain à l'arrivée |
+| **Saisie manuelle** | Le filleul qui reçoit le code oralement le tape dans l'encart « Un ami vous a parrainé ? » |
+| **Condition de validité** | Le filleul doit avoir **exporté au moins un document** (PDF ou envoi pour signature) |
+| **Récompense** | +1 mois offert **au parrain** : le code remerciement est généré chez le filleul (1 seule fois par installation de filleul), transmis sur WhatsApp, puis collé dans « Déjà abonné ? » |
+| **Code nominatif** | Le code récompense est lié à l'installation du parrain : refusé ailleurs. Activable 30 jours |
+| **Plafond** | 12 mois offerts maximum sur 12 mois glissants, par parrain |
+| **Bannière quota bas** | ≤ 5 exports gratuits → bandeau d'urgence avec le code parrain et le bouton « Parrainer » |
+| **Suivi vendeur** | `#/vendeur` → panneau PARRAINAGE : codes émis, mois crédités + génération manuelle (offre 0 F) |
+
+Fichiers concernés : `src/lib/referral.ts` (mécanique), `src/lib/license.ts`
+(kind de code `REFERRAL`, empreinte du code parrain, plafond annuel),
+`src/components/ReferralCard.tsx` (encart parrain/filleul), `src/components/ReferralToast.tsx`
+(rappel « envoyer le code à mon parrain » après le 1er export du filleul).
 
 ## Notes
 
