@@ -240,6 +240,19 @@ export function canExport(l: LicenseState): boolean {
   return getExportCount() < FREE_EXPORT_LIMIT;
 }
 
+/**
+ * Relève le compteur d'exports (jamais ne le baisse). Utilisé à la restauration
+ * d'une sauvegarde : sinon « navigation privée + réimport du JSON » remettrait
+ * les 20 exports gratuits à disposition à l'infini.
+ */
+export function setExportCountAtLeast(n: number) {
+  const target = Math.max(0, Math.floor(Number(n) || 0));
+  if (target <= getExportCount()) return getExportCount();
+  localStorage.setItem(LS_COUNT, String(target));
+  idbPut('export_count', target);
+  return target;
+}
+
 export function remainingFree(l: LicenseState): number {
   if (isLicensed(l)) return Infinity;
   return Math.max(0, FREE_EXPORT_LIMIT - getExportCount());

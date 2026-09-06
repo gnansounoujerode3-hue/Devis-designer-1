@@ -1,4 +1,5 @@
 import { DocType, QuoteData, QuoteItem, SavedClient } from './types';
+import { getExportCount, setExportCountAtLeast } from './lib/license';
 
 const DOCS_KEY = 'devis_designer_docs';
 const CLIENTS_KEY = 'devis_designer_clients';
@@ -220,20 +221,24 @@ export function deleteClient(id: string) { localStorage.setItem(CLIENTS_KEY, JSO
 
 export interface BackupData {
   app: 'devis-designer';
-  version: 1;
+  /** v2 : le compteur d'exports voyage avec la sauvegarde (anti « navigation privée »). */
+  version: 2;
   exportedAt: string;
   docs: QuoteData[];
   clients: SavedClient[];
+  /** Nombre d'exports déjà consommés sur l'appareil qui a exporté la sauvegarde. */
+  exportCount?: number;
 }
 
 /** Exporte toutes les données (devis + clients) en fichier JSON téléchargeable. */
 export function exportAllData(): BackupData {
   return {
     app: 'devis-designer',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     docs: loadAllDocs(),
     clients: loadClients(),
+    exportCount: getExportCount(),
   };
 }
 
@@ -278,10 +283,14 @@ export function importAllData(json: string, mode: 'merge' | 'replace' = 'merge')
     const incomingDocs = (data.docs || []).filter(d => d && typeof d.id === 'string' && d.quoteNumber);
     const incomingClients = (data.clients || []).filter(c => c && typeof c.id === 'string');
 
+    // Le compteur d'exports suit les données : on ne reprend JAMAIS un quota
+    // "neuf" en réimportant une sauvegarde sur un appareil vierge (max retenu).
+    const restoredCount = typeof data.exportCount === 'number' ? setExportCountAtLeast(data.exportCount) : getExportCount();
+
     if (mode === 'replace') {
       saveAllDocs(incomingDocs);
       localStorage.setItem(CLIENTS_KEY, JSON.stringify(incomingClients));
-      return { ok: true, message: `${incomingDocs.length} document(s) et ${incomingClients.length} client(s) restaurés.` };
+      return { ok: true, message: `${incomingDocs.length} document(s) et ${incomingClients.length} client(s) restaurés.${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}` };
     }
 
     // Merge : on garde les existants, on ajoute les nouveaux
@@ -297,7 +306,7 @@ export function importAllData(json: string, mode: 'merge' | 'replace' = 'merge')
 
     saveAllDocs(mergedDocs);
     localStorage.setItem(CLIENTS_KEY, JSON.stringify(mergedClients));
-    return { ok: true, message: `${incomingDocs.length} document(s) importé(s) (${mergedDocs.length} au total).` };
+    return { ok: true, message: `${incomingDocs.length} document(s) importé(s) (${mergedDocs.length} au total).${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}` };
   } catch {
     return { ok: false, message: 'Impossible de lire ce fichier.' };
   }

@@ -8,6 +8,7 @@ import {
   REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR,
 } from '../lib/license';
 import { VENDOR, VENDOR_PIN } from '../lib/config';
+import VendorQuotaPanel from './VendorQuotaPanel';
 import { fetchWorkerReferralStats, isWorkerReferralEnabled, type WorkerReferralStats } from '../lib/referral';
 
 /* ============================================================
@@ -356,6 +357,9 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
             )}
           </div>
         </section>
+
+        {/* Quota d'exports : demandes de déblocage des clients */}
+        <VendorQuotaPanel />
 
         {/* Génération de code */}
         <section className="rounded-2xl bg-white dark:bg-zinc-900 border border-[#ECECEC] dark:border-zinc-800 p-4 sm:p-5">

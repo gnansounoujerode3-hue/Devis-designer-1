@@ -6,13 +6,18 @@ import {
 } from '../lib/license';
 import { VENDOR, CHARIOW_LINKS, createChariowPayment, AUTO_PAY_WORKER_URL } from '../lib/config';
 import { getMyRefCode } from '../lib/referral';
+import { quotaRefresh, type QuotaState } from '../lib/quota';
 import ReferralCard from './ReferralCard';
+import QuotaUnlockCard from './QuotaUnlockCard';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** true si le blocage vient d'une tentative de création */
   blocked?: boolean;
+  /** État du compteur d'exports côté serveur (null = compteur purement local). */
+  quota?: QuotaState | null;
+  onQuotaChange?: (q: QuotaState | null) => void;
   onActivated?: () => void;
 }
 
@@ -27,7 +32,7 @@ const OFFERS: { id: OfferId; title: string; price: number; desc: string; badge?:
 
 const fmt = (n: number) => n.toLocaleString('fr-FR') + ' F';
 
-export default function PaywallModal({ open, onClose, blocked, onActivated }: Props) {
+export default function PaywallModal({ open, onClose, blocked, quota, onQuotaChange, onActivated }: Props) {
   const [license, setLicense] = useState<LicenseState>(() => loadLicense());
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -152,7 +157,15 @@ export default function PaywallModal({ open, onClose, blocked, onActivated }: Pr
   if (!open) return null;
 
   const refresh = () => { setLicense(loadLicense()); onActivated?.(); };
-  const used = getExportCount();
+  // Le compteur affiché est le plus sévère des deux : local ou serveur.
+  const used = quota ? Math.max(getExportCount(), quota.used) : getExportCount();
+  // À l'ouverture, on relit le serveur (un déblocage a pu être accordé entre-temps).
+  useEffect(() => {
+    if (!open || isLicensed(loadLicense())) return ;
+    let alive = true;
+    void quotaRefresh().then(q => { if (alive) onQuotaChange?.(q); });
+    return () => { alive = false; };
+  }, [open]);
 
   const handlePay = async (off: (typeof OFFERS)[number]) => {
     if (autoPay) { await startAutoPay(off); return; }
@@ -188,13 +201,17 @@ export default function PaywallModal({ open, onClose, blocked, onActivated }: Pr
             <p className="text-sm text-[#888] mt-1">
               {isLicensed(license)
                 ? ` Abonnement actif — reste ${daysLeft(license)} jour(s)`
-                : `${Math.min(used, FREE_EXPORT_LIMIT)} / ${FREE_EXPORT_LIMIT} exports gratuits utilisés${blocked ? ' — passez à Pro pour continuer' : ''}`}
+                : `${Math.min(used, FREE_EXPORT_LIMIT)} / ${FREE_EXPORT_LIMIT} exports gratuits utilisés${quota && quota.used > getExportCount() ? ` (compteur serveur : ${Math.min(quota.used, quota.limit)} / ${quota.limit} sur ${quota.windowDays} j)` : ''}${blocked ? ' — passez à Pro pour continuer' : ''}`}
             </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[#F0F0F0] dark:hover:bg-zinc-800 flex items-center justify-center text-[#999]"></button>
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Compteur serveur + demande de déblocage (mode dur) */}
+          {blocked && quota && (
+            <QuotaUnlockCard quota={quota} onChanged={onQuotaChange} />
+          )}
           {/* Paiement automatique : coordonnées du client (requis par Chariow) */}
           {autoPay && autoState !== 'done' && (
             <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#0057FF66' }}>

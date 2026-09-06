@@ -14,6 +14,7 @@ import Onboarding from './components/Onboarding';
 import LegalModal from './components/LegalModal';
 import FAQModal from './components/FAQModal';
 import { loadLicense, isLicensed, canExport, incrementExportCount, remainingFree, restoreExportCountFromBackup, daysLeft } from './lib/license';
+import { quotaReserve, quotaConfirm, quotaRelease, quotaRefresh, getQuotaCache, effectiveRemaining, quotaIsServerManaged, type QuotaState } from './lib/quota';
 import { saveParrainCode, getMyRefCode, whatsappShareUrl, settleReferralReward, syncReferralFromWorker } from './lib/referral';
 import { downloadBlob, downloadBackup, importAllData } from './store';
 
@@ -118,6 +119,8 @@ export default function App() {
   const [licenseTick, setLicenseTick] = useState(0);
   /** Rafraîchit l'encart parrainage après un export (code remerciement du parrain). */
   const [referralTick, setReferralTick] = useState(0);
+  /** État du compteur d'exports (serveur si disponible, sinon local). */
+  const [quota, setQuota] = useState<QuotaState | null>(() => getQuotaCache());
   const [onboarding, setOnboarding] = useState(false);
   const [legalOpen, setLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'cgu' | 'privacy'>('cgu');
@@ -131,7 +134,11 @@ export default function App() {
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); localStorage.setItem('devis_dark', dark ? '1' : '0'); }, [dark]);
   useEffect(() => { setDocs(loadAllDocs()); setClients(loadClients()); }, []);
   // Restaure le compteur d'exports depuis la sauvegarde IndexedDB (anti-reset)
-  useEffect(() => { restoreExportCountFromBackup().then(() => setLicenseTick(t => t + 1)); }, []);
+  useEffect(() => {
+    restoreExportCountFromBackup().then(() => { setLicenseTick(t => t + 1); return quotaRefresh(); })
+      .then(q => { if (q) setQuota(q); })
+      .catch(() => { /* silencieux : le compteur local prend le relais */ });
+  }, []);
   // Onboarding au premier lancement
   useEffect(() => {
     try {
@@ -202,12 +209,26 @@ export default function App() {
   const goHome = () => { saveDoc(data); setDocs(loadAllDocs()); setPage('list'); };
   const handleNew = () => { const d = createDefaultDoc(); saveDoc(d); setDocs(loadAllDocs()); openDoc(d); };
   const handleDuplicate = (doc: QuoteData) => { const d = duplicateDoc(doc); setDocs(loadAllDocs()); openDoc(d); };
-  /** Vérifie le quota d'exports (20 gratuits) avant export PDF / envoi signature. */
-  const guardExport = () => {
+  /**
+   * Vérifie le quota d'exports AVANT de produire le document.
+   * Deux niveaux : le compteur de l'appareil (20 gratuits) et, si le Worker est
+   * joignable, une réservation serveur sur l'empreinte de l'appareil — une
+   * fenêtre de navigation privée ne remet donc plus le compteur à zéro.
+   * Renvoie false (et ouvre le paywall) si l'export est refusé.
+   */
+  const guardExport = async (): Promise<boolean> => {
     const lic = loadLicense();
+    if (isLicensed(lic) && canExport(lic)) return true;
     if (!canExport(lic)) { setPaywallBlocked(true); setPaywall(true); return false; }
+    const q = await quotaReserve();
+    setQuota(q);
+    if (!q.allowed) { setPaywallBlocked(true); setPaywall(true); return false; }
     return true;
   };
+  /** Le document est sorti : on confirme la réservation (et on relit le reste). */
+  const confirmQuota = () => { void quotaConfirm().then(q => { if (q) setQuota(q); }); };
+  /** Le document n'a pas pu être produit : on rend la place réservée. */
+  const releaseQuota = () => { void quotaRelease(); setQuota(getQuotaCache()); };
   /**
    * Après un export / envoi réussi : le parrainage de CETTE installation est
    * peut-être validé (1er export) → on prépare le code remerciement de 1 mois
@@ -477,7 +498,7 @@ export default function App() {
 
   const downloadPDF = useCallback(async () => {
     if (!svgRef.current) return;
-    if (!guardExport()) return;
+    if (!(await guardExport())) return;
     setPdfLoading(true);
     try {
       const svgEl = svgRef.current; const vb = svgEl.viewBox.baseVal;
@@ -504,17 +525,21 @@ export default function App() {
       }
       doc.save(data.docType + '-' + data.quoteNumber + '.pdf');
       incrementExportCount(); setLicenseTick(t => t + 1);
+      confirmQuota();
       notifyReferral();
-    } catch (err) { console.error(err); alert('Erreur PDF'); } finally { setPdfLoading(false); setExportOpen(false); }
+    } catch (err) { console.error(err); alert('Erreur PDF'); releaseQuota(); } finally { setPdfLoading(false); setExportOpen(false); }
   }, [data.quoteNumber, data.fontFamily, data.docType, buildFontFaceCSS]);
 
-  const generateSignatureFile = useCallback(() => {
+  const generateSignatureFile = useCallback(async () => {
     if (!svgRef.current) return;
-    if (!guardExport()) return;
+    if (!(await guardExport())) return;
     const blob = buildSignatureHtml(svgRef.current, data);
-    downloadBlob(blob, 'signer-' + data.quoteNumber + '.html'); setExportOpen(false);
-    incrementExportCount(); setLicenseTick(t => t + 1);
-    notifyReferral();
+    try {
+      downloadBlob(blob, 'signer-' + data.quoteNumber + '.html'); setExportOpen(false);
+      incrementExportCount(); setLicenseTick(t => t + 1);
+      confirmQuota();
+      notifyReferral();
+    } catch { releaseQuota(); }
   }, [data]);
 
   const fmt = useCallback((n: number) => formatMoney(n, data.currency), [data.currency]);
@@ -533,6 +558,8 @@ export default function App() {
       <PaywallModal
         open={paywall}
         blocked={paywallBlocked}
+        quota={quota}
+        onQuotaChange={setQuota}
         onClose={() => { setPaywall(false); setPaywallBlocked(false); }}
         onActivated={() => setLicenseTick(t => t + 1)}
       />
@@ -565,7 +592,7 @@ export default function App() {
               <button onClick={() => { setPaywallBlocked(false); setPaywall(true); }} className={`h-8 sm:h-10 px-2 sm:px-4 rounded-lg text-[10px] sm:text-xs font-bold flex items-center gap-1 sm:gap-2 border transition-colors whitespace-nowrap flex-shrink-0 ${isLicensed(loadLicense()) ? 'border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30' : 'border-[#0057FF]/30 text-[#0057FF] bg-blue-50 dark:bg-blue-950/30'}`}>
                 {isLicensed(loadLicense())
                   ? <>PRO</>
-                  : <><span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#0057FF] animate-pulse" /> {remainingFree(loadLicense())}<span className="hidden sm:inline"> EXPORTS GRATUITS</span></>}
+                  : <><span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#0057FF] animate-pulse" /> {effectiveRemaining(remainingFree(loadLicense()))}<span className="hidden sm:inline"> EXPORTS GRATUITS</span></>}
               </button>
               <button onClick={handleNew} className="h-8 sm:h-10 px-2 sm:px-5 rounded-lg bg-[#0057FF] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 hover:opacity-90 active:scale-95 shadow-md flex-shrink-0">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -578,7 +605,7 @@ export default function App() {
           {/* Bannière quota bas — urgence + partage */}
           {(() => {
             const lic = loadLicense();
-            const rem = remainingFree(lic);
+            const rem = effectiveRemaining(remainingFree(lic));
             if (isLicensed(lic) || rem > 5 || docs.length === 0) return null;
             return (
               <div className={`mb-5 rounded-xl border-2 border-dashed p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${rem <= 2 ? 'border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/30' : 'border-[#BFDBFE] dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20'}`}>
@@ -588,6 +615,12 @@ export default function App() {
                   </div>
                   <div className="text-[11px] text-[#777] dark:text-zinc-400 mt-0.5">
                      Passez à Pro pour exporter sans limite, ou parrainez un ami : 1 parrainage valide = 1 mois offert pour vous.
+                     {quotaIsServerManaged() && quota ? (
+                       <span className="block text-[10px] text-[#999] mt-0.5">
+                         Compteur serveur : {quota.used}/{quota.limit} exports sur {quota.windowDays} jours glissants
+                         {quota.resetInDays > 0 ? ` · remise à zéro dans ${quota.resetInDays} j` : ''} — la navigation privée ne réinitialise rien.
+                       </span>
+                     ) : null}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

@@ -214,9 +214,107 @@ export default {
         return json(out, 200, cors);
       }
 
+      /* ---- 2sex. QUOTA : etat courant (appelé à l'ouverture de l'app) ---- */
+      if (path === '/quota/state' && request.method === 'POST') {
+        const body = await readJson(request);
+        const st = await quotaState(env, normFp(body.fp), normDevice(body.deviceId), request);
+        return json({ ok: true, ...st }, 200, cors);
+      }
+
+      /* ---- 2sex2. QUOTA : reserver 1 export AVANT de le produire ----
+         C'est l'appel qui compte : un client qui ne declare pas ses exports
+         ne gagne rien, la fenetre glissante de 30 jours tourne quand meme. */
+      if (path === '/quota/reserve' && request.method === 'POST') {
+        const body = await readJson(request);
+        const fp = normFp(body.fp), deviceId = normDevice(body.deviceId);
+        if (!fp && !deviceId) return json({ ok: false, error: 'Empreinte manquante.' }, 200, cors);
+        /* On decide sur l'etat AVANT de compter : le 20e export gratuit doit
+           passer, le 21e seulement est refusé. */
+        const before = await quotaState(env, fp, deviceId);
+        if (!before.allowed) {
+          await kvPut(env, 'log:quota', { at: new Date().toISOString(), fp: fp.slice(0, 10), deviceId, used: before.used, limit: before.limit });
+          return json({ ok: true, ...before, reserved: false, allowed: false, blocked: true }, 200, cors);
+        }
+        const st = await quotaBump(env, fp, deviceId, +1, request);
+        return json({ ok: true, ...st, reserved: true, allowed: true }, 200, cors);
+      }
+
+      /* ---- 2sex3. QUOTA : confirmation / restitution ---- */
+      if (path === '/quota/confirm' && request.method === 'POST') {
+        const body = await readJson(request);
+        const fp = normFp(body.fp);
+        await kvPut(env, 'qok:' + fp, { at: Date.now(), deviceId: normDevice(body.deviceId) });
+        /* On renvoie l'etat : l'app rafraichit son compteur sans 2e appel. */
+        const st = await quotaState(env, fp, normDevice(body.deviceId));
+        return json({ ok: true, ...st }, 200, cors);
+      }
+      if (path === '/quota/release' && request.method === 'POST') {
+        const body = await readJson(request);
+        const st = await quotaBump(env, normFp(body.fp), normDevice(body.deviceId), -1, request);
+        return json({ ok: true, ...st }, 200, cors);
+      }
+
+      /* ---- 2sex4. QUOTA : demande de deblocage formule par le client ---- */
+      if (path === '/quota/request' && request.method === 'POST') {
+        const body = await readJson(request);
+        const fp = normFp(body.fp);
+        if (!fp) return json({ ok: false, message: 'Empreinte manquante.' }, 400, cors);
+        const key = 'qreq:' + fp;
+        const prev = await kvGet(env, key, null);
+        if (prev && Date.now() - (prev.atMs || 0) < 12 * 3600000) {
+          return json({ ok: true, already: true, message: 'Votre demande est deja enregistree, le vendeur va la traiter.' }, 200, cors);
+        }
+        await kvPut(env, key, {
+          atMs: Date.now(), at: new Date().toISOString(), fp, deviceId: normDevice(body.deviceId),
+          note: String(body.note || '').slice(0, 300), ip: request.headers.get('cf-connecting-ip') || null,
+          country: (request.cf && request.cf.country) || null, ua: (request.headers.get('user-agent') || '').slice(0, 160),
+        });
+        return json({ ok: true, message: 'Demande transmise au vendeur. Vous serez debloque des qu il valide.' }, 200, cors);
+      }
+
+      /* ---- 2sex5. QUOTA : file d'attente + grants (espace vendeur) ---- */
+      if (path === '/quota/pending' && request.method === 'POST') {
+        const body = await readJson(request);
+        if (body.admin !== getAdminPass(env)) return json({ ok: false, message: 'Non autorise.' }, 401, cors);
+        const out = { ok: true, requests: [], blocked: 0, truncated: false };
+        try {
+          const listed = await env.DD_KV.list({ prefix: 'qreq:', limit: 200 });
+          const keys = (listed.keys || []).slice(0, 60);
+          if ((listed.keys || []).length >= 200) out.truncated = true;
+          for (const k of keys) {
+            const r = await kvGet(env, k.name, null);
+            if (!r) continue;
+            const st = await quotaState(env, r.fp || k.name.slice(5), r.deviceId || '');
+            out.requests.push({ ...r, used: st.used, limit: st.limit, remaining: st.remaining, unlocked: st.unlocked, resetInDays: st.resetInDays });
+          }
+          out.requests.sort((a, b) => (b.atMs || 0) - (a.atMs || 0));
+          out.blocked = out.requests.length;
+        } catch (e) {
+          out.error = 'KV indisponible : ' + (e && e.message ? String(e.message).slice(0, 80) : 'erreur');
+        }
+        return json(out, 200, cors);
+      }
+      if (path === '/quota/grant' && request.method === 'POST') {
+        const body = await readJson(request);
+        if (body.admin !== getAdminPass(env)) return json({ ok: false, message: 'Non autorise.' }, 401, cors);
+        const fp = normFp(body.fp);
+        if (!fp) return json({ ok: false, message: 'Empreinte manquante.' }, 400, cors);
+        const days = Math.max(1, Math.min(365, parseInt(String(body.days || '30'), 10) || 30));
+        await kvPut(env, 'qunlock:' + fp, { until: Date.now() + days * 86400000, days, at: new Date().toISOString() });
+        if (body.clearRequest !== false) await kvDelete(env, 'qreq:' + fp);
+        return json({ ok: true, message: 'Deblocage de ' + days + ' jour(s) accorde.' }, 200, cors);
+      }
+      if (path === '/quota/revoke' && request.method === 'POST') {
+        const body = await readJson(request);
+        if (body.admin !== getAdminPass(env)) return json({ ok: false, message: 'Non autorise.' }, 401, cors);
+        const fp = normFp(body.fp);
+        await kvDelete(env, 'qunlock:' + fp);
+        return json({ ok: true }, 200, cors);
+      }
+
       /* ---- 3. ESPACE VENDEUR : générer un code (avec mot de passe) ---- */
       if (path === '/vendor/gen' && request.method === 'POST') {
-        const body = await request.json();
+        const body = await readJson(request);
         if (body.admin !== getAdminPass(env)) return json({ ok: false, message: 'Non autorise.' }, 401, cors);
         const code = await makeCode(body.kind, body.months || 1, env, body.to);
         return json({ ok: true, code }, 200, cors);
@@ -224,7 +322,7 @@ export default {
 
       /* ---- 4. PAIEMENT AUTO : créer la vente Chariow ---- */
       if (path === '/checkout' && request.method === 'POST') {
-        const body = await request.json();
+        const body = await readJson(request);
         const offer = String(body.offer || '').toUpperCase();
         const deviceId = String(body.deviceId || '').toUpperCase();
         const customer = body.customer || {};
@@ -400,7 +498,7 @@ export default {
 
       /* ---- 6. PAIEMENT AUTO : l'app interroge le statut ---- */
       if (path === '/check' && request.method === 'POST') {
-        const body = await request.json();
+        const body = await readJson(request);
         const purchaseId = String(body.purchaseId || '');
         const deviceId = String(body.deviceId || '').toUpperCase();
         const rec = await kvGet(env, 'pay:' + purchaseId, null);
@@ -456,6 +554,101 @@ export default {
     }
   },
 };
+
+/* ---------------- QUOTA D'EXPORTS (anti-navigtion-privee) ----------------
+   Le compteur local (localStorage/IndexedDB) est remise a zero par une fenetre
+   privee ou un autre navigateur : la verite est donc ici, sur deux seaux :
+     qfp:<empreinte>   = exports sur 30 jours glissants pour cet appareil (signaux
+                        stables, identiques en navigation privee)
+     qdev:<deviceId>   = idem pour cette installation (code parrain)
+   Le nombre retenu est le MAX des deux : creer un nouveau pseudo-appareil ne
+   remet pas le compteur a zero. Deblocage manuel du vendeur : qunlock:<empreinte>.
+   Reglable par variables : QUOTA_LIMIT, QUOTA_WINDOW_DAYS, QUOTA_USE_IP. */
+
+/** Corps JSON tolérant : un body invalide ne doit jamais finir en 500. */
+async function readJson(request) {
+  try {
+    const b = await request.json();
+    return b && typeof b === 'object' ? b : {};
+  } catch { return {}; }
+}
+
+function quotaLimit(env) {
+  const n = parseInt(String(envGet(env, 'QUOTA_LIMIT') || '20'), 10);
+  return isFinite(n) && n > 0 ? n : 20;
+}
+function quotaWindowMs(env) {
+  const d = parseFloat(envGet(env, 'QUOTA_WINDOW_DAYS') || '30');
+  return (isFinite(d) && d > 0 ? d : 30) * 86400000;
+}
+function quotaUseIp(env) {
+  return String(envGet(env, 'QUOTA_USE_IP') || '0') === '1';
+}
+function normFp(v) {
+  return String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+}
+
+/** Lit (sans le modifier) l'etat du quota pour une empreinte / une installation. */
+async function quotaState(env, fp, deviceId) {
+  const limit = quotaLimit(env), win = quotaWindowMs(env), now = Date.now();
+  const buckets = [];
+  if (fp) buckets.push(await kvGet(env, 'qfp:' + fp, null));
+  if (deviceId) buckets.push(await kvGet(env, 'qdev:' + deviceId, null));
+  const live = buckets.filter(b => b && typeof b.count === 'number' && now - (b.start || 0) <= win);
+  const used = live.reduce((m, b) => Math.max(m, b.count || 0), 0);
+  const nextReset = live.length ? Math.min(...live.map(b => (b.start || now) + win)) : now + win;
+  const unl = fp ? await kvGet(env, 'qunlock:' + fp, null) : null;
+  const unlocked = !!(unl && unl.until > now);
+  return {
+    used, limit, remaining: unlocked ? limit : Math.max(0, limit - used),
+    allowed: unlocked || used < limit, unlocked,
+    unlockDays: unlocked ? Math.max(1, Math.ceil((unl.until - now) / 86400000)) : 0,
+    resetInDays: Math.max(0, Math.ceil((nextReset - now) / 86400000)),
+    windowDays: Math.round(win / 86400000),
+  };
+}
+
+/** Increment (-1 = restitution) les deux seaux, puis renvoie l'etat. */
+async function quotaBump(env, fp, deviceId, delta, request) {
+  const limit = quotaLimit(env), win = quotaWindowMs(env), now = Date.now();
+  const ip = request && request.headers ? (request.headers.get('cf-connecting-ip') || '') : '';
+  const keys = [];
+  if (fp) keys.push('qfp:' + fp);
+  if (deviceId) keys.push('qdev:' + deviceId);
+  if (quotaUseIp(env) && ip && fp) keys.push('qip:' + fp.slice(0, 6) + ':' + ip);
+  /* Tentative au-dela du plafond : on NE COMPTE PAS (sinon le compteur
+     afficherait 21/20 et chaque refus aggraverait la peine). On renvoie juste
+     l'etat, blocked = true. */
+  if (delta > 0 && keys.length) {
+    const peek = [];
+    for (const key of keys) {
+      const b = await kvGet(env, key, null);
+      if (b && typeof b.count === 'number' && now - (b.start || 0) <= win) peek.push(b.count);
+    }
+    const unl = fp ? await kvGet(env, 'qunlock:' + fp, null) : null;
+    const unlOk = !!(unl && unl.until > now);
+    if (!unlOk && peek.length && Math.max(...peek) >= limit) {
+      const st = await quotaState(env, fp, deviceId);
+      return { ...st, blocked: !st.allowed, delta: 0 };
+    }
+  }
+  for (const key of keys) {
+    let b = await kvGet(env, key, null);
+    if (!b || typeof b.count !== 'number' || now - (b.start || 0) > win) b = { start: now, count: 0 };
+    b.count = Math.max(0, (b.count || 0) + delta);
+    b.at = now;
+    await kvPut(env, key, b);
+  }
+  if (fp) {
+    const meta = (await kvGet(env, 'qmeta:' + fp, null)) || { devices: [], ips: [], at: now };
+    if (deviceId && !meta.devices.includes(deviceId)) meta.devices = [deviceId, ...(meta.devices || [])].slice(0, 6);
+    if (ip && !meta.ips.includes(ip)) meta.ips = [ip, ...(meta.ips || [])].slice(0, 6);
+    meta.at = now;
+    await kvPut(env, 'qmeta:' + fp, meta);
+  }
+  const st = await quotaState(env, fp, deviceId);
+  return { ...st, blocked: !st.allowed, delta };
+}
 
 /* ---------------- PARRAINAGE (politique unique de mois offerts) ----------------
    1 parrainage valide (1er export du filleul) = 1 mois offert AU PARRAIN.
@@ -543,6 +736,10 @@ async function kvGet(env, key, fallback) {
 
 async function kvPut(env, key, value) {
   try { await env.DD_KV.put(key, JSON.stringify(value)); } catch { /* ignore */ }
+}
+
+async function kvDelete(env, key) {
+  try { await env.DD_KV.delete(key); } catch { /* ignore */ }
 }
 
 /* ---------------- Base32 (identique à l'app) ---------------- */

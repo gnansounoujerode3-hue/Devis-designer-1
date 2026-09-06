@@ -51,6 +51,21 @@ export const AUTO_PAY_WORKER_URL = 'https://devisdesigner.gnansounoujerode3.work
 export const REFERRAL_VIA_WORKER = true;
 
 /* ------------------------------------------------------------------
+   QUOTA D'EXPORTS CÔTÉ SERVEUR (anti navigation privée / multi-appareils).
+   true : avant chaque export PDF ou envoi pour signature, l'app réserve un
+          export auprès du Worker (POST /quota/reserve). Le Worker compte sur
+          l'empreinte de l'appareil + le code d'installation (max des deux),
+          sur une fenêtre glissante de 30 jours : ouvrir une fenêtre privée,
+          changer de navigateur ou effacer les données ne remet plus le
+          compteur à zéro. Au-delà du plafond, le client peut demander un
+          déblocage que vous accordez en 1 clic dans #/vendeur.
+   false: compteur purement local (contournable en navigation privée).
+   Si le Worker est injoignable, l'app retombe toujours sur le compteur local.
+   Plafond et fenêtre se règlent côté Worker : QUOTA_LIMIT, QUOTA_WINDOW_DAYS.
+   ------------------------------------------------------------------ */
+export const QUOTA_SERVER_ENFORCEMENT = true;
+
+/* ------------------------------------------------------------------
    Liens de paiement Chariow.
    Créez un lien de paiement par produit dans votre tableau de bord
    Chariow, puis collez l'URL ici. Si un lien est vide (''), le bouton

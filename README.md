@@ -52,7 +52,7 @@ devis-designer/
 
 | Offre | Prix | Effet |
 |---|---|---|
-| Gratuit | 0 F | **20 exports PDF / envois signature** par installation (la création de devis est libre) |
+| Gratuit | 0 F | **20 exports PDF / envois signature** par appareil sur 30 jours glissants, comptés par le serveur (la création de devis reste libre) — voir [Quota anti navigation privée](#-quota-dexports-anti-navigation-privée) |
 | Abonnement mensuel | 2 000 F / mois | Exports illimités pendant 1 mois (cumulable) |
 | Abonnement 1 an | 15 000 F / an | Exports illimités pendant 1 an |
 | Design personnalisé | 5 000 F | Un design sur mesure pour votre template (paiement unique) |
@@ -111,6 +111,13 @@ Client                Worker Cloudflare              Chariow
 | `POST /referral/export` | Signale un export du filleul → valide le parrainage et **émet** le code récompense (1 par filleul, plafond 12 mois/an par parrain) |
 | `POST /referral/status` | Relit l'état d'une installation (réinstall, stockage vidé) |
 | `POST /referral/stats` | Compteurs de parrainage pour l'espace vendeur (`admin` = `ADMIN_PASS`) |
+| `POST /quota/state` | Lecture du compteur d'exports d'un appareil (empreinte + code d'installation, max des deux) |
+| `POST /quota/reserve` | **Réserve 1 export avant de le produire** : refus au-delà de `QUOTA_LIMIT` sur `QUOTA_WINDOW_DAYS` jours |
+| `POST /quota/confirm` | Confirme l'export (le compteur est déjà engagé) et renvoie l'état à jour |
+| `POST /quota/release` | Restitue la place si la génération du PDF a échoué |
+| `POST /quota/request` | Le client demande un déblocage au vendeur (1 demande / 12 h par empreinte) |
+| `POST /quota/pending` | File d'attente des demandes pour l'espace vendeur (`admin` = `ADMIN_PASS`) |
+| `POST /quota/grant` / `POST /quota/revoke` | Accord / retrait d'un déblocage temporaire (en jours), lié à l'empreinte |
 | `GET /debug` | Diagnostic (secrets, KV, dernier webhook) |
 
 > ⚠️ Ces routes `/*referral*` sont **nouvelles** : redéployez `backend/worker.js`
@@ -124,6 +131,10 @@ Client                Worker Cloudflare              Chariow
    collez le contenu de `backend/worker.js` → Deploy, puis :
    - Variables : `SECRET_KEYS` (JSON, ex `{"v1":"votre-secret"}`),
      `ADMIN_PASS`, `REF_MIN_AGE_HOURS` (optionnel, anti-abus parrainage),
+     `QUOTA_LIMIT` (exports gratuits par appareil, défaut 20),
+     `QUOTA_WINDOW_DAYS` (fenêtre glissante en jours, défaut 30),
+     `QUOTA_USE_IP` = `1` pour compter aussi par IP (attention : en Afrique de l'Ouest
+     beaucoup de clients partagent la même IP opérateur — à ne activer qu'en cas d'abus massif),
      `CHARIOW_KEY` (clé API `sk_live_...`),
      `CHARIOW_PULSE_SECRET` (le `whsec_...`),
      `PRODUCT_IDS` = `{"MONTHLY":"prd_...","ANNUAL":"prd_...","DESIGN":"prd_...","ALL":"prd_..."}`
@@ -227,6 +238,50 @@ Fichiers concernés : `src/lib/referral.ts` (mécanique), `src/lib/license.ts`
 (kind de code `REFERRAL`, empreinte du code parrain, plafond annuel),
 `src/components/ReferralCard.tsx` (encart parrain/filleul), `src/components/ReferralToast.tsx`
 (rappel « envoyer le code à mon parrain » après le 1er export du filleul).
+
+## 🛡️ Quota d'exports anti navigation privée
+
+**Problème réglé** : le compteur des 20 exports gratuits vivait uniquement dans le
+navigateur. Une fenêtre de navigation privée, un autre navigateur, un autre appareil
+— ou simplement « Effacer les données du site » — le remettait à zéro : on pouvait
+exporter à l'infini gratuitement. Le compteur ne voyageait même pas dans la
+sauvegarde JSON, donc « navigation privée + réimport » suffisait.
+
+**Deux couches désormais** (`src/lib/quota.ts` + les routes `/quota/*` du Worker) :
+
+| Couche | Ce qui se passe |
+|---|---|
+| **B — la sauvegarde transporte le compteur** | `exportAllData()` écrit `exportCount` dans le JSON (`version: 2`) ; `importAllData()` lui applique `setExportCountAtLeast()`, qui ne fait **qu'augmenter** le compteur. Réimporter une sauvegarde ne rend donc jamais de quota neuf. |
+| **A — le serveur tient le compteur** | Avant chaque PDF / envoi signature, l'app appelle `POST /quota/reserve`. Le Worker compte sur **l'empreinte de l'appareil** (signaux non effacés par la navigation privée : userAgent, langue, plateforme, cœurs, écran, fuseau horaire…) **et** sur le code d'installation, en retenant le **max des deux seaux** sur une fenêtre glissante de 30 jours. Une nouvelle « installation » ne remet donc rien à zéro. |
+| **Blocage dur** | Au-delà du plafond, l'export est refusé (paywall), **sauf** déblocage accordé par le vendeur. Un échec de génération restitue la place (`/quota/release`), le refus n'aggrave pas le compteur. |
+| **Déblocage en 1 clic** | Le client bloque → bouton « Vous êtes un nouveau client ? » dans le paywall → `POST /quota/request`. Vous voyez la demande dans `#/vendeur` (panneau **QUOTA D'EXPORTS & DÉBLOCAGES** : empreinte, note du client, IP/pays, compteur) et vous cliquez sur *Débloquer 30 j / 7 j / 1 j*. Le client n'a rien à faire d'autre : le déblocage suit l'**empreinte**, pas l'installation. |
+| **Hors-ligne** | Worker injoignable ⇒ l'app retombe sur son compteur local. Un client légitime sans réseau n'est **jamais** bloqué à cause du serveur. |
+| **Abonnés** | Une licence active court directement : aucun appel `/quota/*` n'est émis pour elle. |
+
+### Réglages
+
+- Côté app : `QUOTA_SERVER_ENFORCEMENT = false` dans `src/lib/config.ts` revient à
+  l'ancien fonctionnement (compteur purement local).
+- Côté Worker : variables `QUOTA_LIMIT` (20), `QUOTA_WINDOW_DAYS` (30), `QUOTA_USE_IP` (0/1).
+- `ADMIN_PASS` du Worker doit être **identique** au `VENDOR_PIN` de
+  `src/lib/config.ts` (sinon le panneau vendeur affiche « PIN vendeur refusé par le
+  serveur »). Idem pour `/referral/stats`.
+- N'oubliez pas de **redéployer** `backend/worker.js` et de reconstruire l'app :
+  sans les routes `/quota/*`, le compteur reste local (aucun blocage du client).
+
+### Ce que ça ne fait pas (honnêtement)
+
+Ce n'est **pas de la DRM**. L'app tourne dans le navigateur : quelqu'un qui modifie le
+bundle, auto-héberge une copie ou retire l'appel au Worker contourne la couche A — il
+lui reste la couche locale (B). Le dispositif ferme les portes ouvertes à tout le monde
+(fenêtre privée, changement de navigateur, effacement du stockage, réimport de
+sauvegarde, multi-installs sur le même PC) ; il ne ferme pas la porte à un développeur
+déterminé qui possède le code. Pour du blocage réellement infranchissable, il faut
+que le PDF soit **généré côté serveur** (les données ne sortent jamais brutes) : c'est
+un autre chantier.
+
+Entre les deux, les leviers à faible effort restent : abaisser `QUOTA_LIMIT`, ou ajouter
+un filigrane « Version d'essai » sur les PDF gratuits.
 
 ## Notes
 
