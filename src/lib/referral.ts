@@ -73,9 +73,16 @@ export function isReferred(): boolean {
 
 /* ---------------- Message de recommandation (partage de l'app) ---------------- */
 
+/** Lien de téléchargement portant déjà le code parrain (le filleul n'a rien à taper). */
+export function referralDownloadLink(): string {
+  const code = getMyRefCode();
+  if (!/^https?:\/\//i.test(APP_DOWNLOAD_LINK)) return APP_DOWNLOAD_LINK;
+  return APP_DOWNLOAD_LINK + (APP_DOWNLOAD_LINK.includes('?') ? '&' : '?') + 'ref=' + code;
+}
+
 export function buildShareMessage(): string {
   const c = getMyRefCode();
-  return `Devis Designer — créez vos devis et factures professionnels en un clin d'oeil.\n20 exports gratuits. Abonnement 2000 F/mois ou 15000 F/an.\nTélécharger : ${APP_DOWNLOAD_LINK}\nCode parrain : ${c}\n(Parrainage : 1 ami qui installe avec ce code et exporte un devis = 1 mois offert pour moi.)`;
+  return `Devis Designer — créez vos devis et factures professionnels en un clin d'oeil.\n20 exports gratuits. Abonnement 2000 F/mois ou 15000 F/an.\nTélécharger : ${referralDownloadLink()}\nCode parrain : ${c}\n(Parrainage : 1 ami qui installe avec ce code et exporte un devis = 1 mois offert pour moi.)`;
 }
 
 /** URL WhatsApp pré-remplie pour recommander l'app. */

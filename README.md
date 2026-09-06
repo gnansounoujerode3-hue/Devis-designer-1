@@ -190,7 +190,7 @@ aucune contrepartie, et il n'existe aucun concours ni autre dispositif de mois g
 |---|---|
 | **Code parrain** | Chaque installation a un code unique `DDREF-XXXXXXXX` (bouton « PRO » → encart PARRAINAGE) |
 | **Partage WhatsApp 1 clic** | Bouton « Parrainer un ami sur WhatsApp » : message pré-écrit + lien + code parrain |
-| **Lien `?ref=`** | `https://votre-app/?ref=DDREF-XXXXXXXX` enregistre automatiquement le code parrain à l'arrivée |
+| **Lien `?ref=`** | `https://votre-app/?ref=DDREF-XXXXXXXX` enregistre automatiquement le code parrain à l'arrivée — le message de partage construit ce lien tout seul à partir de `VENDOR.DOWNLOAD_LINK` (voir `referralDownloadLink()`) |
 | **Saisie manuelle** | Le filleul qui reçoit le code oralement le tape dans l'encart « Un ami vous a parrainé ? » |
 | **Condition de validité** | Le filleul doit avoir **exporté au moins un document** (PDF ou envoi pour signature) |
 | **Récompense** | +1 mois offert **au parrain** : le code remerciement est généré chez le filleul (1 seule fois par installation de filleul), transmis sur WhatsApp, puis collé dans « Déjà abonné ? » |
