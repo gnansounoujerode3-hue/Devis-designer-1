@@ -22,8 +22,15 @@ export default {
       /* ---- 0. DIAGNOSTIC (ouverture dans le navigateur) ---- */
       if (path === '/debug' && request.method === 'GET') {
         const out = {
+          version: '2026-09-06 (quota + parrainage serveur)',
           secretKeysCount: Object.keys(getSecretKeys(env)).length,
           adminPassSet: getAdminPass(env) !== 'change-me',
+          /* Contrôles de déploiement : si ces lignes manquent, l'app retombe en local. */
+          quotaRoutes: true,
+          referralRoutes: true,
+          quotaLimit: quotaLimit(env),
+          quotaWindowDays: quotaWindowMs(env) / 86400000,
+          quotaUseIp: quotaUseIp(env),
           chariowKey: null,
           pulseSecret: null,
           productIds: null,

@@ -21,6 +21,7 @@
 
 import { FREE_EXPORT_LIMIT, getExportCount, isLicensed, loadLicense } from './license';
 import { AUTO_PAY_WORKER_URL, QUOTA_SERVER_ENFORCEMENT } from './config';
+import { workerAdminKey } from './adminKey';
 import { getMyRefCode } from './referral';
 
 const WORKER_BASE = (AUTO_PAY_WORKER_URL || '').replace(/\/+$/, '');
@@ -306,13 +307,15 @@ export interface QuotaPending {
   message?: string;
 }
 
-export async function fetchQuotaRequests(adminPass: string): Promise<QuotaPending> {
+/** `adminPass` = la clé serveur (ADMIN_PASS), saisie dans #/vendeur — jamais le PIN de page. */
+export async function fetchQuotaRequests(adminPass: string = workerAdminKey()): Promise<QuotaPending> {
   if (!isServerQuotaEnabled()) return { ok: false, message: 'Worker non configuré (AUTO_PAY_WORKER_URL vide).' };
+  if (!adminPass) return { ok: false, message: 'Clé serveur non renseignée sur cet appareil : saisissez la valeur de ADMIN_PASS dans le bandeau « Clé serveur ».' };
   const data = await callWorkerRaw('/quota/pending', { admin: adminPass }, 12000);
   if (!data) return { ok: false, message: 'Worker injoignable. Déployez la version récente de backend/worker.js.' };
   if (data.ok !== true) {
     const why = String(data.error || data.message || '');
-    return { ok: false, error: why, message: /autoris/i.test(why) ? 'PIN vendeur refusé par le serveur (variable ADMIN_PASS du Worker ≠ PIN saisi).' : 'Le serveur a refusé : ' + (why || 'réponse invalide') + '.' };
+    return { ok: false, error: why, message: /autoris|401/i.test(why) ? 'Clé serveur refusée par le Worker : elle doit être identique à sa variable ADMIN_PASS (bandeau « Clé serveur »).' : 'Le serveur a refusé : ' + (why || 'réponse invalide') + '.' };
   }
   return {
     ok: true,
@@ -323,14 +326,14 @@ export async function fetchQuotaRequests(adminPass: string): Promise<QuotaPendin
 }
 
 /** Débloquent temporaire accordé par le vendeur (en jours). */
-export async function grantQuotaUnlock(adminPass: string, fp: string, days: number): Promise<{ ok: boolean; message: string }> {
+export async function grantQuotaUnlock(fp: string, days: number, adminPass: string = workerAdminKey()): Promise<{ ok: boolean; message: string }> {
   const data = await callWorkerRaw('/quota/grant', { admin: adminPass, fp, days }, 12000);
   if (!data) return { ok: false, message: 'Worker injoignable.' };
   if (data.ok !== true) return { ok: false, message: String(data.error || data.message || 'Déblocage refusé par le serveur.') };
   return { ok: true, message: String(data.message || 'Déblocage accordé.') };
 }
 
-export async function revokeQuotaUnlock(adminPass: string, fp: string): Promise<{ ok: boolean; message: string }> {
+export async function revokeQuotaUnlock(fp: string, adminPass: string = workerAdminKey()): Promise<{ ok: boolean; message: string }> {
   const data = await callWorkerRaw('/quota/revoke', { admin: adminPass, fp }, 12000);
   if (!data) return { ok: false, message: 'Worker injoignable.' };
   if (data.ok !== true) return { ok: false, message: String(data.error || data.message || 'Retrait refusé par le serveur.') };

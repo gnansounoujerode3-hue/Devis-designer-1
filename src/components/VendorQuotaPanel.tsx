@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   fetchQuotaRequests, grantQuotaUnlock, revokeQuotaUnlock, type QuotaRequest,
 } from '../lib/quota';
-import { VENDOR_PIN } from '../lib/config';
+import { hasWorkerAdminKey } from '../lib/adminKey';
 
 function ago(atMs?: number): string {
   if (!atMs) return '—';
@@ -31,7 +31,7 @@ export default function VendorQuotaPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await fetchQuotaRequests(VENDOR_PIN);
+    const r = await fetchQuotaRequests();
     setLoading(false);
     if (!r.ok) { setNote(r.message || 'Worker injoignable.'); return; }
     setRows(r.requests || []);
@@ -45,8 +45,8 @@ export default function VendorQuotaPanel() {
   const act = async (fp: string, kind: 'grant' | 'revoke', days = 30) => {
     setBusy(fp + kind + (kind === 'grant' ? days : '')); setNote(null);
     const r = kind === 'grant'
-      ? await grantQuotaUnlock(VENDOR_PIN, fp, days)
-      : await revokeQuotaUnlock(VENDOR_PIN, fp);
+      ? await grantQuotaUnlock(fp, days)
+      : await revokeQuotaUnlock(fp);
     setBusy(null);
     setNote(r.message);
     if (r.ok) void load();
@@ -69,11 +69,16 @@ export default function VendorQuotaPanel() {
         </button>
       </div>
 
+      {!hasWorkerAdminKey() && (
+        <div className="text-[11.5px] font-bold mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300">
+          Saisissez d'abord la valeur de <code>ADMIN_PASS</code> dans le bandeau « Clé serveur » en haut de page :
+          sans elle, le Worker refuse de lire la file d'attente.
+        </div>
+      )}
       <div className="text-[11px] text-[#888] leading-snug mb-3">
         Le Worker compte <b>20 exports par empreinte d'appareil sur 30 jours glissants</b> (fenêtre privée,
         changement de navigateur ou effacement des données ne remettent pas le compteur à zéro).
-        Réglages côté Worker : <code>QUOTA_LIMIT</code>, <code>QUOTA_WINDOW_DAYS</code>, et{' '}
-        <code>ADMIN_PASS</code> doit être identique au PIN de cet espace pour que ce panneau fonctionne.
+        Réglages côté Worker : <code>QUOTA_LIMIT</code>, <code>QUOTA_WINDOW_DAYS</code>.
       </div>
 
       {note && (

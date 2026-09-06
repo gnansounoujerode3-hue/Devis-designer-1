@@ -9,6 +9,7 @@ import {
 } from '../lib/license';
 import { VENDOR, VENDOR_PIN } from '../lib/config';
 import VendorQuotaPanel from './VendorQuotaPanel';
+import WorkerKeyBar from './WorkerKeyBar';
 import { fetchWorkerReferralStats, isWorkerReferralEnabled, type WorkerReferralStats } from '../lib/referral';
 
 /* ============================================================
@@ -142,7 +143,7 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
 
   const loadWorkerStats = async () => {
     setWloading(true);
-    const r = await fetchWorkerReferralStats(VENDOR_PIN);
+    const r = await fetchWorkerReferralStats();
     setWstats(r);
     setWloading(false);
   };
@@ -270,6 +271,9 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
             </div>
           ))}
         </section>
+
+        {/* Clé admin du Worker (ADMIN_PASS) — saisie une fois, jamais dans le bundle */}
+        <WorkerKeyBar onReady={() => void loadWorkerStats()} />
 
         {/* Parrainage — suivi */}
         <section className="rounded-2xl bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900 p-4 sm:p-5">

@@ -130,7 +130,9 @@ Client                Worker Cloudflare              Chariow
 2. **Cloudflare** (gratuit) : Workers & Pages → Create → Worker →
    collez le contenu de `backend/worker.js` → Deploy, puis :
    - Variables : `SECRET_KEYS` (JSON, ex `{"v1":"votre-secret"}`),
-     `ADMIN_PASS`, `REF_MIN_AGE_HOURS` (optionnel, anti-abus parrainage),
+     `ADMIN_PASS` (n'importe quelle chaîne solide — c'est la clé des routes vendeur,
+     pas le code de la page ; vous la collerez une fois dans `#/vendeur`),
+     `REF_MIN_AGE_HOURS` (optionnel, anti-abus parrainage),
      `QUOTA_LIMIT` (exports gratuits par appareil, défaut 20),
      `QUOTA_WINDOW_DAYS` (fenêtre glissante en jours, défaut 30),
      `QUOTA_USE_IP` = `1` pour compter aussi par IP (attention : en Afrique de l'Ouest
@@ -160,6 +162,10 @@ https://votre-app.com/#/vendeur
 
 1. Saisissez le **PIN** (`VENDOR_PIN` dans `src/lib/config.ts` — par défaut `2468`, **à changer**).
    La session reste ouverte tant que l'onglet est ouvert (déconnexion manuelle possible).
+   Puis, une seule fois, collez la valeur de la variable `ADMIN_PASS` de votre Worker dans
+   le bandeau **CLÉ SERVEUR (WORKER)** et cliquez **Tester la clé** : sans elle, le suivi
+   parrainage et la file des déblocages restent vides (le PIN de la page ne suffit pas,
+   et c'est voulu — il est public).
 2. Depuis le tableau de bord :
    - **Statistiques** : total encaissé, ventes du mois, codes actifs/expirés, clients uniques,
      ventilation par offre
@@ -168,6 +174,8 @@ https://votre-app.com/#/vendeur
      L'offre « Parrainage — 1 mois offert » (0 F) sert à créditer manuellement un parrain
      (nombre de filleuls récompensés réglable, borné à 12 mois)
    - **Panneau PARRAINAGE** : rappel de la politique + codes de récompense émis et mois crédités
+   - **Panneau QUOTA D'EXPORTS & DÉBLOCAGES** : demandes de déblocage reçues (empreinte,
+     note du client, IP/pays, compteur) et boutons 30 j / 7 j / 1 j — voir plus bas
    - **Historique des ventes** : date, client, offre, prix, code, statut (actif/expiré —
      un code reste activable 30 jours après sa génération), copier / WhatsApp / supprimer
    - **Export CSV** de l'historique pour archiver vos ventes
@@ -263,9 +271,19 @@ sauvegarde JSON, donc « navigation privée + réimport » suffisait.
 - Côté app : `QUOTA_SERVER_ENFORCEMENT = false` dans `src/lib/config.ts` revient à
   l'ancien fonctionnement (compteur purement local).
 - Côté Worker : variables `QUOTA_LIMIT` (20), `QUOTA_WINDOW_DAYS` (30), `QUOTA_USE_IP` (0/1).
-- `ADMIN_PASS` du Worker doit être **identique** au `VENDOR_PIN` de
-  `src/lib/config.ts` (sinon le panneau vendeur affiche « PIN vendeur refusé par le
-  serveur »). Idem pour `/referral/stats`.
+- **Deux codes différents, ne les confondez pas** :
+
+  | | À quoi ça sert | Où c'est |
+  |---|---|---|
+  | `VENDOR_PIN` (`2468`) | ouvrir la page `#/vendeur` sur votre écran | `src/lib/config.ts` — donc **dans le bundle public** : ce n'est pas un secret, juste un filtre à curieux |
+  | `ADMIN_PASS` du Worker | autoriser les appels sensibles `POST /referral/stats`, `/quota/pending`, `/quota/grant`, `/quota/revoke` | variable secrète du Worker **et** saisie une seule fois dans `#/vendeur` → bandeau « CLÉ SERVEUR » |
+
+  La clé serveur n'est **jamais écrite dans `config.ts`** (elle se lirait dans le
+  bundle) : vous la collez une fois dans le bandeau « CLÉ SERVEUR », elle reste dans le
+  `localStorage` de *votre* appareil (`dd_worker_admin`, bouton **Oublier** pour l'effacer).
+  Bouton **Tester la clé** = contrôle de déploiement (vert ⇒ stats parrainage et
+  déblocages fonctionnent ; 401 ⇒ la clé saisie ≠ la variable `ADMIN_PASS` ; 404 ⇒
+  `backend/worker.js` pas encore redéployé).
 - N'oubliez pas de **redéployer** `backend/worker.js` et de reconstruire l'app :
   sans les routes `/quota/*`, le compteur reste local (aucun blocage du client).
 

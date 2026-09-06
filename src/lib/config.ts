@@ -22,7 +22,14 @@ export const VENDOR = {
   DOWNLOAD_LINK: 'https://votre-lien-telechargement.com',
 };
 
-/** PIN de l'espace vendeur (génération de codes d'activation). À changer ! */
+/**
+ * Code d'OUVERTURE de la page #/vendeur (génération de codes, suivi). À changer !
+ * Il est dans le bundle : il écarte les curieux, ce n'est pas un secret.
+ * NE LE CONFONDEZ PAS avec la clé admin du Worker (variable ADMIN_PASS) : celle-ci
+ * se saisit une seule fois dans #/vendeur et reste sur votre appareil
+ * (localStorage 'dd_worker_admin', voir src/lib/adminKey.ts) — elle n'est jamais
+ * écrite ici, sinon n'importe qui la lirait dans le bundle.
+ */
 export const VENDOR_PIN = '2468';
 
 /* ------------------------------------------------------------------

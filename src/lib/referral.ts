@@ -30,6 +30,7 @@ import {
   referralMonthsReceivedThisYear, referralMonthsRemaining, getReferralRewards,
 } from './license';
 import { VENDOR, AUTO_PAY_WORKER_URL, REFERRAL_VIA_WORKER } from './config';
+import { workerAdminKey } from './adminKey';
 
 export { REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR };
 /** Empreinte d'un code parrain (identique côté Worker) — exposée pour les contrôles. */
@@ -110,6 +111,10 @@ export function getWorkerState(): WorkerState | null {
 function rememberWorker(ok: boolean) { setItem(LS_WORKER_STATE, JSON.stringify({ ok, at: Date.now() })); }
 
 /** Appel réseau tolérant : renvoie null si le Worker est injoignable ou répond mal. */
+/** Dernier code HTTP reçu du Worker (sert à distinguer 401 « mauvaise clé » de « injoignable »). */
+let lastWorkerStatus = 0;
+export function getLastWorkerStatus(): number { return lastWorkerStatus; }
+
 async function callWorker(path: string, body: Record<string, unknown>, timeoutMs = 8000): Promise<Record<string, unknown> | null> {
   if (!isWorkerReferralEnabled()) return null;
   const ctrl = new AbortController();
@@ -121,6 +126,7 @@ async function callWorker(path: string, body: Record<string, unknown>, timeoutMs
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
+    lastWorkerStatus = res.status;
     const data = await res.json().catch(() => null);
     if (!res.ok || !data || data.ok !== true) {
       // une réponse d'erreur (404 Worker non déployé, 403, …) = serveur inutilisable
@@ -130,6 +136,7 @@ async function callWorker(path: string, body: Record<string, unknown>, timeoutMs
     rememberWorker(true);
     return data as Record<string, unknown>;
   } catch {
+    lastWorkerStatus = 0;
     rememberWorker(false);
     return null;
   } finally {
@@ -348,10 +355,17 @@ export interface WorkerReferralStats {
 }
 
 /** Statistiques de parrainage côté serveur (espace vendeur). */
-export async function fetchWorkerReferralStats(adminPass: string): Promise<WorkerReferralStats> {
+export async function fetchWorkerReferralStats(adminPass: string = workerAdminKey()): Promise<WorkerReferralStats> {
   if (!isWorkerReferralEnabled()) return { ok: false, message: 'Worker non configuré (AUTO_PAY_WORKER_URL vide).' };
+  if (!adminPass) return { ok: false, message: 'Clé serveur non renseignée : saisissez la valeur de ADMIN_PASS dans le bandeau « Clé serveur » de cette page.' };
   const data = await callWorker('/referral/stats', { admin: adminPass }, 12000);
   if (!data) {
+    if (lastWorkerStatus === 401 || lastWorkerStatus === 403) {
+      return { ok: false, message: 'Clé serveur refusée par le Worker (401) : elle doit être identique à sa variable ADMIN_PASS.' };
+    }
+    if (lastWorkerStatus === 404 || lastWorkerStatus === 405) {
+      return { ok: false, message: 'Le Worker répond mais ne connaît pas /referral/stats : redéployez backend/worker.js.' };
+    }
     return { ok: false, message: getWorkerState() && !getWorkerState()!.ok
       ? 'Worker injoignable. Déployez la version récente de backend/worker.js.'
       : 'Worker injoignable.' };
