@@ -7,7 +7,7 @@ import {
   PRICE_MONTHLY, PRICE_ANNUAL, PRICE_CUSTOM_DESIGN, PRICE_ALL,
   REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR,
 } from '../lib/license';
-import { VENDOR, VENDOR_PIN } from '../lib/config';
+import { VENDOR, VENDOR_PIN, APP_VERSION, BUILD_TAG } from '../lib/config';
 import VendorQuotaPanel from './VendorQuotaPanel';
 import WorkerKeyBar from './WorkerKeyBar';
 import { fetchWorkerReferralStats, isWorkerReferralEnabled, type WorkerReferralStats } from '../lib/referral';
@@ -242,7 +242,10 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
           <img src={logoUrl} width={34} height={34} alt="" className="rounded-lg" style={{ objectFit: 'cover' }} />
           <div>
             <div className="text-xs font-black tracking-widest text-[#111] dark:text-white leading-none">ESPACE VENDEUR</div>
-            <div className="text-[10px] text-[#999] mt-0.5">{VENDOR.APP_NAME} — panneau propriétaire</div>
+            <div className="text-[10px] text-[#999] mt-0.5">
+              {VENDOR.APP_NAME} — panneau propriétaire · <b>v{APP_VERSION}</b>
+              {BUILD_TAG ? <span className="text-[#BBB]"> · {BUILD_TAG}</span> : null}
+            </div>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
             <button onClick={() => setDark(!dark)} title="Thème" className="px-3 h-8 rounded-lg text-[11px] font-bold text-[#666] dark:text-zinc-300 hover:bg-[#F0F0F0] dark:hover:bg-zinc-800">{dark ? 'Clair' : 'Sombre'}</button>

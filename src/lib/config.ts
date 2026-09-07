@@ -33,6 +33,17 @@ export const VENDOR = {
 export const VENDOR_PIN = '2468';
 
 /* ------------------------------------------------------------------
+   VERSION AFFICHÉE — votre repère de déploiement.
+   Incrémentez-la à chaque publication : le pied de page de l'app et
+   l'en-tête de l'espace vendeur l'affichent. Un navigateur (ou Netlify)
+   qui affiche encore l'ancienne version = ancien bundle en cache ou
+   dossier mal envoyé.
+   ------------------------------------------------------------------ */
+export const APP_VERSION = '1.0.5';
+/** Marque de build, visible uniquement dans l'espace vendeur. */
+export const BUILD_TAG = 'quota serveur + clé vendeur (2026-09-07)';
+
+/* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).
    Renseignez l'URL de votre Worker Cloudflare (deployé depuis
    backend/worker.js) pour activer le flux automatique :

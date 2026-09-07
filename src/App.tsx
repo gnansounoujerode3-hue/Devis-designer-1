@@ -12,6 +12,7 @@ import PaywallModal from './components/PaywallModal';
 import ReferralToast from './components/ReferralToast';
 import Onboarding from './components/Onboarding';
 import LegalModal from './components/LegalModal';
+import { APP_VERSION } from './lib/config';
 import FAQModal from './components/FAQModal';
 import { loadLicense, isLicensed, canExport, incrementExportCount, remainingFree, restoreExportCountFromBackup, daysLeft } from './lib/license';
 import { quotaReserve, quotaConfirm, quotaRelease, quotaRefresh, getQuotaCache, effectiveRemaining, quotaIsServerManaged, type QuotaState } from './lib/quota';
@@ -711,7 +712,7 @@ export default function App() {
 
           {/* Footer : aide, FAQ, mentions légales */}
           <div className={`mt-10 pt-6 border-t flex flex-wrap items-center justify-between gap-3 ${dark ? 'border-zinc-800' : 'border-[#F0F0F0]'}`}>
-            <div className="text-[10px] text-[#AAA]">Devis Designer · Version 1.0.4</div>
+            <div className="text-[10px] text-[#AAA]">Devis Designer · Version {APP_VERSION}</div>
             <div className="flex gap-4">
               <button onClick={() => setFaqOpen(true)} className="text-[11px] font-bold text-[#888] hover:text-[#0057FF] tracking-wider uppercase">Aide / FAQ</button>
               <button onClick={() => { setLegalTab('cgu'); setLegalOpen(true); }} className="text-[11px] font-bold text-[#888] hover:text-[#0057FF] tracking-wider uppercase">Conditions</button>

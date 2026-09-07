@@ -195,9 +195,28 @@ npm run deploy
 ```
 Ou via le tableau de bord vercel.com : importez le dépôt, framework = Vite, build = `npm run build`, output = `dist`.
 
-### Option 2 — Netlify (gratuit)
-- Glissez-déposez le dossier `dist/` sur app.netlify.com/drop
-- Ou connectez votre dépôt : build `npm run build`, publish `dist`
+### Option 2 — Netlify (gratuit) — votre cas : `devisdesigner.netlify.app`
+Le dépôt ne contient **que les sources** (`dist/` n'est pas versionné) : il faut donc
+publier le build à chaque changement.
+
+**Méthode A — en local (≈ 1 minute)**
+```bash
+npm install
+npm run build                              # -> dist/index.html (fichier unique, ~1,4 Mo)
+npx netlify-cli deploy --prod --dir=dist    # 1re fois : demande une connexion Netlify
+```
+Si le CLI demande sur quel site pousser : `npx netlify-cli link` → choisissez **devisdesigner**.
+
+**Méthode B — à la main** : glissez-déposez le **dossier `dist/`** sur
+<https://app.netlify.com/drop>. Sur un site déjà connecté à Git, laissez Netlify builder
+(build command `npm run build`, publish directory `dist`).
+
+**Vérifier que c'est bien la nouvelle version qui tourne** : le pied de page affiche
+`Devis Designer · Version X.Y.Z` (constante `APP_VERSION` de `src/lib/config.ts`) et
+l'en-tête de `#/vendeur` ajoute la marque de build (`BUILD_TAG`). **Incrémentez
+`APP_VERSION` à chaque publication** : après déploiement, rechargez en dur
+(Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
+browser/Netlify, ou mauvais dossier envoyé).
 
 ### Option 3 — Hébergement classique (OVH, Hostinger, etc.)
 - Téléversez `dist/index.html` (et le dossier `dist/` entier) sur votre espace web
