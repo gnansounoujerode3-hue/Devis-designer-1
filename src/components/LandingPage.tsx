@@ -28,7 +28,7 @@ import type { QuoteData, TemplateId } from '../types';
 const ACCENT = '#0057FF';
 const CARD_RADIUS = 18;
 
-/* Petit utilitaire : 2 000 → « 2 000 F CFA » avec espace insécable française. */
+/* Petit utilitaire : 2000 s'affiche « 2 000 F CFA » (espace insécable française). */
 function price(n: number): string {
   return `${n.toLocaleString('fr-FR').replace(/\u202f|\u00a0/g, ' ')} F CFA`;
 }
@@ -72,6 +72,40 @@ function demoDoc(overrides: Partial<QuoteData> = {}): QuoteData {
     showWatermark: false,
     ...overrides,
   });
+}
+
+/* ------------------------------------------------------------
+   Icônes : SVG inline, monochromes, trait 1.8 — même langage visuel
+   que les icônes du menu « Exporter » de l'application. Pas d'emoji :
+   ils rendent mal selon l'OS et ne suivent ni la couleur ni le mode sombre.
+   ------------------------------------------------------------ */
+type IconName = 'doc' | 'grid' | 'pen' | 'export' | 'users' | 'percent' | 'device' | 'cursor' | 'sun' | 'moon';
+
+function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  const g = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {name === 'doc' && (<g {...g}><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12h6M9 16h4" /></g>)}
+      {name === 'grid' && (<g {...g}><rect x="3.5" y="3.5" width="7" height="7" rx="1.6" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.6" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.6" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.6" /></g>)}
+      {name === 'pen' && (<g {...g}><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14.2 5.8 18.2 9.8" /></g>)}
+      {name === 'export' && (<g {...g}><path d="M12 3v11" /><path d="M8 10.6 12 14.6 16 10.6" /><path d="M4.5 17v3.5h15V17" /></g>)}
+      {name === 'users' && (<g {...g}><circle cx="9" cy="8" r="3.2" /><path d="M3.6 20.4c0-3.1 2.4-5.2 5.4-5.2s5.4 2.1 5.4 5.2" /><path d="M16 5.6a3.2 3.2 0 0 1 0 5.5" /><path d="M17.6 15.6c1.8.7 2.9 2.4 2.9 4.5" /></g>)}
+      {name === 'percent' && (<g {...g}><path d="M19 5 5 19" /><circle cx="8" cy="8" r="2.4" /><circle cx="16" cy="16" r="2.4" /></g>)}
+      {name === 'device' && (<g {...g}><rect x="2.5" y="4.5" width="13.5" height="10.5" rx="1.6" /><path d="M5.5 19h7.5" /><rect x="17.6" y="9" width="4" height="9.5" rx="1.4" /></g>)}
+      {name === 'cursor' && (<g {...g}><path d="M6 3.4 19 8.2l-5.4 1.7-1.8 5.4z" /><path d="M13 14.6 18.4 20" /></g>)}
+      {name === 'sun' && (<g {...g}><circle cx="12" cy="12" r="4" /><path d="M12 2.6v2.1M12 19.3v2.1M2.6 12h2.1M19.3 12h2.1M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M18.7 5.3l-1.5 1.5M6.8 17.2l-1.5 1.5" /></g>)}
+      {name === 'moon' && (<g {...g}><path d="M20 14.6A8.4 8.4 0 1 1 9.6 4.1 7 7 0 0 0 20 14.6z" /></g>)}
+    </svg>
+  );
+}
+
+/* Tuile d'icône, comme dans le menu Exporter de l'app. */
+function IconTile({ name, dark }: { name: IconName; dark: boolean }) {
+  return (
+    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${dark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#F2F2F2] text-[#444]'}`}>
+      <Icon name={name} />
+    </div>
+  );
 }
 
 /* ============================ UI atoms ============================ */
@@ -145,15 +179,15 @@ export default function LandingPage() {
   const mute = dark ? 'text-zinc-400' : 'text-[#555]';
   const soft = dark ? 'text-zinc-500' : 'text-[#888]';
 
-  const features: Array<{ t: string; d: string; i: string }> = [
-    { i: '✍️', t: 'Devis et factures dans la même fiche', d: 'Un document se convertit en facture en un clic, avec sa propre numérotation. Cinq statuts de suivi : brouillon, envoyé, accepté, refusé, payé.' },
-    { i: '🎨', t: `${TEMPLATES.length} modèles mis en page`, d: 'Chaque modèle est une mise en page complète (en-tête, tableau, totaux, conditions), pas un simple habillage. La couleur d’accent et la police se changent à tout moment.' },
-    { i: '🖋️', t: 'Signature en ligne', d: 'Le client signe avec le doigt ou la souris sur le document, ou vous joignez l’image de votre cachet. La date de signature est inscrite sur le PDF.' },
-    { i: '📄', t: 'PDF A4, SVG ou présentation', d: "Export PDF multi-pages prêt à envoyer, SVG vectoriel à confier à l'imprimeur, ou présentation plein écran du devis chez le client." },
-    { i: '👥', t: 'Fichier clients', d: 'Les coordonnées d’un client sont réutilisées d’un document à l’autre : plus rien à retaper pour une relance ou une facture.' },
-    { i: '🧾', t: 'TVA et multi-devises', d: 'Taux de taxe paramétrable, conditions et notes libres imprimées sous le tableau, montants en franc CFA, en euros ou en dollars.' },
-    { i: '💾', t: 'Sauvegarde sur l’appareil', d: 'Tout ce que vous saisissez est enregistré dans le navigateur — automatiquement, toutes les quelques secondes — et vous pouvez exporter une copie JSON à réimporter plus tard sur un autre appareil.' },
-    { i: '🖱️', t: 'Édition directe sur le document', d: "Activez l'édition directe et tapez directement sur l'aperçu : chaque texte du devis est modifiable là où il se lit, sans chercher le bon champ dans le panneau." },
+  const features: Array<{ t: string; d: string; i: IconName }> = [
+    { i: 'doc', t: 'Devis et factures dans la même fiche', d: 'Un document se convertit en facture en un clic, avec sa propre numérotation. Cinq statuts de suivi : brouillon, envoyé, accepté, refusé, payé.' },
+    { i: 'grid', t: `${TEMPLATES.length} modèles mis en page`, d: 'Chaque modèle est une mise en page complète (en-tête, tableau, totaux, conditions), pas un simple habillage. La couleur d’accent et la police se changent à tout moment.' },
+    { i: 'pen', t: 'Signature en ligne', d: 'Le client signe avec le doigt ou la souris sur le document, ou vous joignez l’image de votre cachet. La date de signature est inscrite sur le PDF.' },
+    { i: 'export', t: 'PDF A4, SVG ou présentation', d: "Export PDF multi-pages prêt à envoyer, SVG vectoriel à confier à l'imprimeur, ou présentation plein écran du devis chez le client." },
+    { i: 'users', t: 'Fichier clients', d: 'Les coordonnées d’un client sont réutilisées d’un document à l’autre : plus rien à retaper pour une relance ou une facture.' },
+    { i: 'percent', t: 'TVA et multi-devises', d: 'Taux de taxe paramétrable, conditions et notes libres imprimées sous le tableau, montants en franc CFA, en euros ou en dollars.' },
+    { i: 'device', t: 'Sauvegarde sur l’appareil', d: 'Tout ce que vous saisissez est enregistré dans le navigateur — automatiquement, toutes les quelques secondes — et vous pouvez exporter une copie JSON à réimporter plus tard sur un autre appareil.' },
+    { i: 'cursor', t: 'Édition directe sur le document', d: "Activez l'édition directe et tapez directement sur l'aperçu : chaque texte du devis est modifiable là où il se lit, sans chercher le bon champ dans le panneau." },
   ];
 
   const steps: Array<{ n: string; t: string; d: string }> = [
@@ -211,7 +245,7 @@ export default function LandingPage() {
               aria-label={dark ? 'Passer en mode clair' : 'Passer en mode sombre'}
               className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${dark ? 'bg-zinc-800 border-zinc-700 text-yellow-400' : 'bg-white border-[#E0E0E0] text-zinc-600'}`}
             >
-              {dark ? '☀️' : '🌙'}
+              <Icon name={dark ? 'sun' : 'moon'} size={17} />
             </button>
             <button
               onClick={goApp}
@@ -316,7 +350,7 @@ export default function LandingPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {features.map(f => (
             <div key={f.t} className={`border p-5 transition-shadow hover:shadow-[0_18px_40px_-28px_rgba(0,0,0,0.35)] ${card}`} style={{ borderRadius: CARD_RADIUS }}>
-              <div className="text-[22px] leading-none mb-3" aria-hidden="true">{f.i}</div>
+              <IconTile name={f.i} dark={dark} />
               <div className={`text-[14.5px] font-extrabold leading-snug ${ink}`}>{f.t}</div>
               <p className={`mt-2 text-[13px] leading-relaxed ${mute}`}>{f.d}</p>
             </div>
