@@ -209,7 +209,7 @@ export default function LandingPage() {
     { q: 'Faut-il installer quelque chose ?', a: 'Non. Devis Designer est un site web : vous l’ouvrez dans le navigateur de l’ordinateur ou du téléphone, et le document se met en page immédiatement. En revanche, il faut une connexion internet pour l’ouvrir — l’application ne fonctionne pas hors connexion.' },
     { q: 'Où sont mes documents ?', a: 'Sur votre appareil, dans le stockage du navigateur. Ils ne sont envoyés à aucun serveur. Pensez à exporter régulièrement « Exporter une copie » : c’est ce fichier qui vous permet de tout retrouver après un changement d’ordinateur ou un nettoyage du navigateur.' },
     { q: 'Combien de devis puis-je faire gratuitement ?', a: `${FREE_EXPORT_LIMIT} exports (PDF, image ou envoi en signature) par appareil et par période de 30 jours. Vous pouvez vous abonner, ou demander à un ami de vous parrainer. Au-delà, le compte est réellement tenu par le serveur du vendeur : la navigation privée ne remet pas le compteur à zéro.` },
-    { q: 'Comment ça se passe pour payer ?', a: 'Dans l’application : bouton « PRO », vous choisissez l’offre, vous cliquez sur « Payer ». La caisse de paiement en ligne s’ouvre (Chariow : MTN MoMo, Orange Money, Wave, Moov) et l’offre s’active toute seule dès que le paiement est confirmé — aucun code à recopier. En secours, si la caisse ne répond pas : paiement Mobile Money au numéro du vendeur, puis le code d’activation qu’il vous envoie à saisir dans « Activer ». Dans les deux cas, le paiement ne se renouvelle pas tout seul : l’accès s’arrête à l’échéance, sans prélèvement automatique.' },
+    { q: 'Comment ça se passe pour payer ?', a: 'Dans l’application : bouton « PRO », vous choisissez l’offre, vous cliquez sur « Payer ». La caisse de paiement en ligne s’ouvre (Chariow : MTN MoMo, Orange Money, Wave, Moov) et l’offre s’active toute seule dès que le paiement est confirmé — aucun code à recopier. Le paiement ne se renouvelle pas tout seul : l’accès s’arrête à l’échéance, sans prélèvement automatique. Si la caisse était injoignable, le vendeur peut activer l’offre avec un code.' },
     { q: 'Et si je change d’ordinateur ?', a: 'Exportez une copie JSON depuis l’ancien poste (« Sauvegarder »), réimportez-la sur le nouveau. Le compteur d’exports est transféré avec la copie, pour ne pas repartir de zéro ni repartir sans limite.' },
   ];
 
@@ -442,28 +442,11 @@ export default function LandingPage() {
             ))}
             <div className={`rounded-[20px] border p-6 flex flex-col ${card}`}>
               <div className={`text-[12.5px] font-extrabold uppercase tracking-wider ${soft}`}>Comment payer</div>
-              <ol className="mt-3 space-y-3">
-                {[
-                  {
-                    t: (<>Dans l'application : bouton <b className={ink}>« PRO »</b>, l'offre, puis <b className={ink}>« Payer »</b>. La caisse de paiement en ligne s'ouvre (Chariow : MTN MoMo, Orange Money, Wave, Moov) et l'offre s'active <b className={ink}>toute seule</b> dès le paiement confirmé — aucun code à recopier.</>),
-                  },
-                  {
-                    t: (<>
-                      <b className={ink}>Si la caisse ne répond pas</b> (à titre de secours) : paiement Mobile Money
-                      direct au <b className={ink}>{VENDOR.PHONE}</b>, vous envoyez la référence par WhatsApp et le
-                      vendeur vous transmet un code à coller dans « Activer ».
-                    </>),
-                  },
-                ].map((row, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="w-[22px] h-[22px] rounded-full shrink-0 mt-0.5 flex items-center justify-center text-[11px] font-extrabold text-white" style={{ background: ACCENT }}>
-                      {i + 1}
-                    </span>
-                    <p className={`text-[13.5px] leading-relaxed ${mute}`}>{row.t}</p>
-                  </li>
-                ))}
-              </ol>
-              <p className={`mt-4 text-[12px] ${soft}`}>Dans les deux cas : aucun prélèvement automatique, aucun renouvellement forcé.</p>
+              <p className={`mt-3 text-[13.5px] leading-relaxed ${mute}`}>
+                Dans l'application : bouton <b className={ink}>« PRO »</b>, l'offre, puis <b className={ink}>« Payer »</b>.
+                La caisse de paiement en ligne s'ouvre (Chariow : MTN MoMo, Orange Money, Wave, Moov) et l'offre
+                s'active <b className={ink}>toute seule</b> dès le paiement confirmé — aucun code à recopier.
+              </p>
               <button
                 onClick={goApp}
                 className="mt-auto pt-0 h-11 rounded-xl text-white text-[14px] font-bold"

@@ -144,9 +144,10 @@ ok(/connexion/.test(meta('og:description')) || /connexion/.test(meta('descriptio
    'le texte partagé dit qu’une connexion est nécessaire');
 
 /* ---------- 8. Le chemin de paiement, tel qu'il est vraiment codé ---------- */
-/* Le client qui lit la page doit trouver la MÊME chose que dans l'app : caisse
-   Chariow d'abord (activation automatique), numéro du vendeur ensuite, à titre
-   de secours uniquement. Tout ce qui est affirmé ici est vérifié dans le code. */
+/* Le client qui lit la page doit trouver la MÊME chose que dans l'app : la caisse
+   Chariow et son activation automatique — rien d'autre. Le chemin manuel est un
+   secours traité dans l'app, pas une consigne publique. Et tout ce que la page
+   affirme est vérifié dans le code (pas de promesse non tenue). */
 ok(/Chariow/.test(text), 'la page nomme la caisse Chariow');
 ok(!/Où acheter/.test(text) && /Comment payer/.test(text), 'la carte ne dit plus « Où acheter » mais « Comment payer »');
 ok(/activation automatique|s'active toute seule|s’active toute seule/.test(text), 'il est dit que l\u2019offre s\u2019active toute seule');
@@ -159,18 +160,22 @@ const worker = readFileSync(src('backend/worker.js'), 'utf8');
 ok(/api\.chariow\.com\/v1\/checkout/.test(worker), 'le Worker cr\u00e9e bien la vente Chariow');
 ok(/<OfferId|'DESIGN'/.test(worker) && /kind === 'DESIGN'/.test(worker), 'le Worker conna\u00eet l\u2019offre DESIGN promise par la page');
 ok(/\u00ab PRO \u00bb|>PRO</.test(app), 'le bouton « PRO » cit\u00e9 par la page existe dans l’app');
-/* le num\u00e9ro du vendeur ne doit JAMAIS \u00eatre pr\u00e9sent\u00e9 comme le moyen normal de payer */
-const phoneIdx = noComments.indexOf('VENDOR.PHONE');
-ok(phoneIdx >= 0, 'la page cite toujours le num\u00e9ro du vendeur (secours)');
-if (phoneIdx >= 0) {
-  const around = noComments.slice(Math.max(0, phoneIdx - 420), phoneIdx + 220).replace(/\s+/g, ' ');
-  ok(/secours|ne r\u00e9pond pas|injoignable/.test(around), 'le num\u00e9ro est encadr\u00e9 par la mention « secours »', around.slice(0, 180));
-}
+/* La page publique ne doit PAS vendre le chemin manuel ni en donner le mode
+   d'emploi : elle décrit la caisse, point. Le secours reste dans l'app
+   (PaywallModal) et le contact du vendeur est accessible par le bouton WhatsApp. */
+ok(!/envoyez la référence|numéro du vendeur|paiement Mobile Money direct/i.test(text),
+   'la page ne détaille plus le paiement direct au vendeur');
+const payCard = /Comment payer[\s\S]{0,700}/.exec(noComments)?.[0] || '';
+ok(!/VENDOR\.PHONE/.test(payCard), 'la carte « Comment payer » ne porte aucune autre adresse à payer');
+ok(/Ouvrir l'application/.test(payCard), 'et renvoie \u00e0 ouvrir l\u2019application');
+ok(/VENDOR\.WHATSAPP/.test(noComments) && /wa\.me/.test(readFileSync(src('src/lib/config.ts'), 'utf8')),
+   'le contact du vendeur reste à portée : le bouton WhatsApp vient de la config');
 /* entrée de FAQ sur le paiement : la caisse doit être décrite AVANT le numéro du vendeur */
 const landingSrc = readFileSync(src('src/components/LandingPage.tsx'), 'utf8');
 const payFaq = /Comment ça se passe pour payer[^\n]*/.exec(landingSrc)?.[0] || '';
 ok(payFaq.length > 60, 'la page garde une entrée de FAQ sur le paiement');
-ok(/Chariow/.test(payFaq) && payFaq.indexOf('Chariow') < payFaq.indexOf('vendeur'), 'la FAQ de la page met la caisse avant le paiement direct', payFaq.slice(0, 150));
+ok(/Chariow/.test(payFaq) && payFaq.indexOf('Chariow') < payFaq.indexOf('vendeur'), 'la FAQ de la page met la caisse avant le secours', payFaq.slice(0, 150));
+ok(!/Activer \u00bb|num\u00e9ro du vendeur|r\u00e9f\u00e9rence/.test(payFaq), 'la FAQ ne r\u00e9dige plus le chemin manuel');
 ok(/FAQ s\u00e9curis\u00e9e Chariow|caisse s\u00e9curis\u00e9e Chariow/.test(readFileSync(src('src/components/FAQModal.tsx'), 'utf8')), 'la FAQ dans l’app dit la m\u00eame chose (caisse Chariow)');
 
 console.log(`\nPAGE D'ACCUEIL : ${pass} réussis, ${fail} échoués`);

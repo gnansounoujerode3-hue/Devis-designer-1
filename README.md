@@ -247,10 +247,12 @@ sans compte MoMo, paiement en espèces, Worker hors service) :
 2. Vous générez le **code d'activation** dans `#/vendeur` (voir « Espace vendeur »).
 3. Vous lui transmettez le code (1 clic WhatsApp). Il le saisit dans « Déjà abonné ? » → licence activée.
 
-> Ce deuxième chemin doit rester écrit comme **secours** partout où il apparaît (page
-> d'accueil, FAQ, `PaywallModal`) : présenté comme la voie normale, il fait croire au client
-> qu'il doit vous envoyer de l'argent et attendre — alors que la caisse active tout seule.
-> `npm run test:ui` le vérifie (« le numéro est encadré par la mention secours »).
+> Ce deuxième chemin **ne s'écrit pas sur la page d'accueil** : un visiteur qui y lit
+> « payez au numéro du vendeur, on vous enverra un code » cherche votre numéro au lieu de
+> payer — alors que la caisse active tout seule. La page ne décrit donc que Chariow ; le
+> secours reste là où le client l'utilise vraiment, c'est-à-dire dans l'app
+> (`PaywallModal`, message d'erreur du Worker + FAQ). `npm run test:ui` tient la ligne :
+> « la page ne détaille plus le paiement direct au vendeur ».
 
 ### Personnalisation (`src/lib/config.ts`)
 - `VENDOR.PHONE` / `VENDOR.WHATSAPP` / `VENDOR.EMAIL` : vos coordonnées
