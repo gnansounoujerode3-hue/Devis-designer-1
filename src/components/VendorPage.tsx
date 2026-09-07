@@ -8,6 +8,7 @@ import {
   REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR,
 } from '../lib/license';
 import { VENDOR, VENDOR_PIN, APP_VERSION, BUILD_TAG } from '../lib/config';
+import { goApp } from '../lib/route';
 import VendorQuotaPanel from './VendorQuotaPanel';
 import WorkerKeyBar from './WorkerKeyBar';
 import { fetchWorkerReferralStats, isWorkerReferralEnabled, type WorkerReferralStats } from '../lib/referral';
@@ -64,7 +65,7 @@ export default function VendorPage() {
 
   const login = () => { try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* ignore */ } setAuthed(true); };
   const logout = () => { try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ } setAuthed(false); };
-  const backToApp = () => { window.location.hash = ''; };
+  const backToApp = () => { goApp(); };
 
   return authed
     ? <Dashboard dark={dark} setDark={setDark} onLogout={logout} onBack={backToApp} />

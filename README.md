@@ -2,7 +2,8 @@
 
 Générateur de devis et factures professionnels en SVG/PDF, **100 % web** :
 aucune installation, accessible depuis n'importe quel navigateur (PC, téléphone, tablette),
-mises à jour automatiques.
+mises à jour automatiques. Le site présente deux vues : une **page d'accueil publique**
+(landing : offre, modèles, tarifs, parrainage, FAQ) puis **l'application** elle-même.
 
 ## Démarrage rapide
 
@@ -32,6 +33,36 @@ npm run preview    # prévisualiser le build
 - **FAQ, CGU et politique de confidentialité** intégrés (conforme loi n°2017-20 Bénin)
 - **Rappel d'expiration** d'abonnement, carnet de clients, filigrane de statut
 
+## Page d'accueil publique (landing)
+
+| URL | Vue |
+| --- | --- |
+| `/` (racine) | **Landing**, sauf si le visiteur a déjà ouvert l'app : dans ce cas il retombe directement sur l'application (préférence `dd_view` en `localStorage`) |
+| `#/accueil` ou `#/home` | Landing, même pour un visiteur qui a choisi l'app |
+| `#/app` | L'application (bouton « Ouvrir l'application », lien « Accueil » dans le pied de page de l'app pour revenir en arrière) |
+| `#/vendeur` | Espace vendeur (jamais linked depuis le site) |
+
+Décision prise dans `src/lib/route.ts` (`resolveRoute()` est une fonction pure : elle est testable sans DOM).
+
+**Ce qu'il faut savoir quand on modifie `src/components/LandingPage.tsx` :**
+
+- **Aucun texte inventé.** Les tarifs viennent de `src/lib/license.ts`
+  (`FREE_EXPORT_LIMIT`, `PRICE_*`), les modèles de `src/templates/index.ts` : la page les
+  lit, elle ne les recopie pas. Si vous changez un prix, la landing suit automatiquement.
+- **Pas de promesse de fonctionnement hors connexion** : l'app est un site web, elle a
+  besoin d'internet pour s'ouvrir (la landing le dit dans le hero et dans sa FAQ).
+- **Pas de témoignages, notes ou chiffres d'usage** : uniquement des faits vérifiables.
+- Les aperçus de documents sont **réels** : ce sont les composants des modèles
+  (`QuoteSVG`) qui rendent un jeu de données de démonstration, étiqueté « document de
+  démonstration ». N'y mettez pas de faux clients réels.
+- Les liens de navigation font défiler la page **sans toucher au `hash`** (sinon ils
+  seraient pris pour des routes) : gardez `scrollToId()`, ne remplacez pas par `href="#id"`.
+- `?ref=DDREF-…` est capté **aussi sur la landing** : un filleul qui lit la page d'accueil
+  sans entrer dans l'app garde déjà le parrainage enregistré.
+- `index.html` : données structurées JSON-LD (`SoftwareApplication`) + `canonical` +
+  squelette de chargement. Le `og:url`/`canonical` doivent suivre un changement de
+  `VENDOR.DOWNLOAD_LINK`.
+
 ## Structure
 
 ```
@@ -45,10 +76,12 @@ devis-designer/
 └── src/
     ├── main.tsx        # Bootstrap React
     ├── App.tsx         # Composant racine
-    ├── components/     # Paywall, Espace vendeur (VendorPage), FAQ, Legal, Onboarding...
+    ├── components/     # LandingPage (accueil public), Paywall, Espace vendeur (VendorPage),
+    │                 # FAQ, Legal, Onboarding...
     ├── templates/      # Les 12 templates SVG
-    ├── lib/            # license (codes émis en local), quota (compteur serveur), referral
-    │                   # (parrainage), adminKey (clé ADMIN_PASS), config, store...
+    ├── lib/            # route (accueil ↔ app), license (codes émis en local),
+    │                   # quota (compteur serveur), referral (parrainage),
+    │                   # adminKey (clé ADMIN_PASS), config, store...
     ├── store.ts        # Persistance localStorage + sauvegarde JSON
     ├── types.ts        # Types partagés
     └── assets/         # Logo

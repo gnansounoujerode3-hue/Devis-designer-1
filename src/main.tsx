@@ -2,24 +2,29 @@ import { Component, StrictMode, useEffect, useState, type ReactNode } from "reac
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import LandingPage from "./components/LandingPage";
 import VendorPage from "./components/VendorPage";
+import { currentView, type View } from "./lib/route";
 
 /* ============================================================
-   ROUTE CACHÉE — ESPACE VENDEUR
-   La page réservée au propriétaire est accessible uniquement
-   via l'URL  <origine>/#/vendeur  (aucune liaison dans l'app).
+   ROUTES
+   #/accueil  page d'accueil publique (landing)  — aussi la vue par
+              défaut tant que le visiteur n'a pas ouvert l'app
+   #/app      l'application elle-même
+   #/vendeur  espace réservé au propriétaire (aucune liaison depuis le
+              site : l'URL se saisit à la main)
+   Le détail de la décision est dans src/lib/route.ts.
    ============================================================ */
-const isVendorRoute = () => window.location.hash.startsWith("#/vendeur");
-
 function Root() {
-  const [vendor, setVendor] = useState(isVendorRoute);
+  const [view, setView] = useState<View>(currentView);
   useEffect(() => {
-    const onHash = () => setVendor(isVendorRoute());
+    const onHash = () => setView(currentView());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
-  if (vendor) return <VendorPage />;
-  return <App />;
+  if (view === "vendor") return <VendorPage />;
+  if (view === "app") return <App />;
+  return <LandingPage />;
 }
 
 /* ============================================================
