@@ -11,7 +11,7 @@
         jamais recopiés à la main.
    La règle de fond : on ne promet que ce que le code fait.
    ============================================================ */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LandingPage from '../src/components/LandingPage';
 import { APP_VERSION } from '../src/lib/config';
@@ -115,6 +115,33 @@ const designClause = cgu.slice(cgu.indexOf('Design personnalis'), cgu.indexOf('D
 ok(/5 000 F CFA/.test(designClause) && /1 mois d'exports illimit\u00e9s/.test(designClause), 'les CGU disent ce que le design inclut');
 ok(/importer|importe/.test(designClause) && /6 designs/.test(designClause), 'les CGU d\u00e9crivent la livraison par fichier et la limite');
 ok(!/\.tsx/.test(designClause), 'les CGU ne promettent pas d\u2019ex\u00e9cuter du .tsx');
+
+/* ---------- 7. La vignette de partage (WhatsApp & cie) ---------- */
+/* Sans og:image à URL absolue, un lien partagé part SANS VISUEL. Autant le tenir
+   sous verrou : l'URL, le fichier, ses dimensions réelles et la cohérence domaine. */
+const meta = (prop: string) => new RegExp(`(?:property|name)="${prop}" content="([^"]*)"`).exec(head)?.[1] || '';
+const og = meta('og:image');
+ok(/^https:\/\/\S+\.png$/.test(og), 'og:image est une URL absolue en .png', og);
+ok(!!og && new URL(og).origin === new URL(meta('og:url') || 'https://devisdesigner.netlify.app/').origin,
+   'la vignette est servie sur le même domaine que le site', og + ' vs ' + meta('og:url'));
+const ogFile = 'public/' + (og ? new URL(og).pathname.replace(/^\//, '') : 'og-image.png');
+ok(existsSync(src(ogFile)), 'le fichier existe dans ' + ogFile + ' (Vite le recopie dans dist/)');
+if (existsSync(src(ogFile))) {
+  const buf = readFileSync(src(ogFile));
+  ok(buf.slice(1, 4).toString('latin1') === 'PNG', 'c’est bien un PNG (les réseaux ne lisent pas le SVG)');
+  const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
+  ok(w === 1200 && h === 630, 'dimensions réelles 1200×630', w + '×' + h);
+  ok(Number(meta('og:image:width')) === w && Number(meta('og:image:height')) === h, 'les dimensions déclarées sont les vraies');
+  ok(/content="image\/png"/.test(head), 'og:image:type déclaré');
+  ok(buf.length < 400_000, 'poids sous 400 ko (' + Math.round(buf.length / 1000) + ' ko)');
+}
+ok(meta('twitter:card') === 'summary_large_image', 'twitter:card en grand visuel');
+/* la règle de vérité vaut aussi pour l'en-tête HTML */
+for (const forbidden of ['hors-ligne', 'hors ligne', 'sans connexion', 'T\u00e9l\u00e9charger', '★', '★★★★★']) {
+  ok(!head.includes(forbidden), 'head : absent « ' + forbidden + ' »');
+}
+ok(/connexion/.test(meta('og:description')) || /connexion/.test(meta('description')),
+   'le texte partagé dit qu’une connexion est nécessaire');
 
 console.log(`\nPAGE D'ACCUEIL : ${pass} réussis, ${fail} échoués`);
 if (fail) process.exit(1);

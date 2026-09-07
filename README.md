@@ -110,11 +110,40 @@ le TSX avec un shim DOM minimal — `tests/shim.js` — et laisse `react`/`react
 | Suite | Ce qu'elle tient |
 | --- | --- |
 | `tests/design_test.tsx` | Tout le trajet du design sur mesure : pack du vendeur → fichier signé → refus des fichiers modifiés, tronqués, trop gros → import → **rendu par le vrai `QuoteSVG`** → emplacements 1 à 6 (ajout, remplacement, plafond, retrait) → sauvegarde JSON et restauration (avec blob falsifié) → code d'activation `DESIGN` → carte d'import dans les deux états. Les gabarits testés sont dans `tests/fixtures/`. |
-| `tests/landing_test.tsx` | La page d'accueil se rend ; ses chiffres viennent des constantes (`PRICE_*`, `FREE_EXPORT_LIMIT`, `TEMPLATES.length`) et non de nombres recopiés ; aucune promesse interdite (mode hors-ligne, téléchargement, témoignages et étoiles inventés, ancien forfait de 3 mois, avoir) ; aucun emoji ; chaque mention du réseau dit la vérité. |
+| `tests/landing_test.tsx` | La page d'accueil se rend ; ses chiffres viennent des constantes (`PRICE_*`, `FREE_EXPORT_LIMIT`, `TEMPLATES.length`) et non de nombres recopiés ; aucune promesse interdite (mode hors-ligne, téléchargement, témoignages et étoiles inventés, ancien forfait de 3 mois, avoir) ; aucun emoji ; chaque mention du réseau dit la vérité ; la vignette de partage existe, fait 1200×630 et est déclarée sur le bon domaine. |
 
 Une suite sort en code 1 si elle échoue, donc `npm test` a sa place dans une CI. Le réflexe qui
 les garde vivantes : changez un comportement, écrivez l'assertion **avant**, elle doit rougir
 puis verdir.
+
+## Vignette de partage (ce que voient WhatsApp et les autres)
+
+Un lien partagé n'affiche **aucun visuel** si la page ne déclare pas d'`og:image`.
+Trois règles, vérifiées par `npm run test:ui` :
+
+- l'URL est **absolue** (`https://devisdesigner.netlify.app/og-image.png`) et sur le même
+  domaine que `og:url` ;
+- le fichier est un **PNG raster** de **1200×630** (pas de SVG : les robots d'aperçu ne le
+  lisent pas), sous 400 ko, et vit dans `public/` pour que Vite le recopie dans `dist/` ;
+- les dimensions déclarées (`og:image:width` / `:height`) sont les dimensions **réelles** du
+  fichier.
+
+Pour la refaire (copie, prix, couleurs) :
+
+```bash
+pip install pillow                                # seule dépendance
+python3 scripts/make-og-image.py                  # écrit public/og-image.png
+python3 scripts/make-og-image.py --title "…" --sub "…" --chips "a|b|c" --url mondomaine.app
+```
+
+Le visuel est **dessiné par le script** (aucune capture d'écran) : le texte et la
+mise en page de la vignette se règlent donc comme du code, et le faux document de droite
+suit les proportions A4 réelles (794×1123). `index.html` porte les balises ; le script
+accepte `--size`, `--logo`, `--note` (et `--note ""` pour retirer la ligne discrète).
+
+> **Après déploiement**, si WhatsApp affiche toujours l'ancien aperçu : il **met la vignette
+> en cache**. Renvoyez le lien avec un paramètre différent (`https://devisdesigner.netlify.app/?v=2`)
+> pour le forcer à re-scroller la page, ou attendez quelques heures.
 
 ## Page d'accueil publique (landing)
 
@@ -154,9 +183,12 @@ devis-designer/
 ├── package.json        # Dépendances & scripts
 ├── vite.config.ts      # Configuration Vite (fichier unique)
 ├── tsconfig.json       # TypeScript strict
+├── public/
+│   └── og-image.png  # vignette des partages (WhatsApp, LinkedIn…) — voir « Vignette de partage »
 ├── backend/
 │   └── worker.js       # Serveur : codes d'activation, quota d'exports, parrainage (Cloudflare Worker)
 ├── scripts/
+│   ├── make-og-image.py  # régénère public/og-image.png (nécessite Pillow)
 │   ├── design-pack.ts  # Le packager du vendeur : npm run design:pack -- <mon.tsx> --name="…"
 │   └── design-example.tsx  # Gabarit de modèle commenté (contrat du fichier livré)
 ├── tests/
