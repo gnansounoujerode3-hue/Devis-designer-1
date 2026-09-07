@@ -56,6 +56,16 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
   useEffect(() => { if (!open) { stopPolling(); setAutoState('idle'); setAutoMsg(null); setRealStatus(null); setCheckoutUrl(null); } }, [open]);
   useEffect(() => () => stopPolling(), []);
 
+  /* À l'ouverture, on relit le serveur (un déblocage a pu être accordé entre-temps).
+     Ce hook est placé AVANT le `if (!open) return null` : après, le nombre de hooks
+     changerait entre deux rendus et React plante (erreur #310). */
+  useEffect(() => {
+    if (!open || isLicensed(loadLicense())) return;
+    let alive = true;
+    void quotaRefresh().then(q => { if (alive) onQuotaChange?.(q); });
+    return () => { alive = false; };
+  }, [open]);
+
   /* À la réouverture : si un paiement récent est resté en cours (l'utilisateur
      a pu payer sur Orqex après avoir fermé la fenêtre), reprendre la
      vérification et activer automatiquement si c'est confirmé. */
@@ -159,14 +169,6 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
   const refresh = () => { setLicense(loadLicense()); onActivated?.(); };
   // Le compteur affiché est le plus sévère des deux : local ou serveur.
   const used = quota ? Math.max(getExportCount(), quota.used) : getExportCount();
-  // À l'ouverture, on relit le serveur (un déblocage a pu être accordé entre-temps).
-  useEffect(() => {
-    if (!open || isLicensed(loadLicense())) return ;
-    let alive = true;
-    void quotaRefresh().then(q => { if (alive) onQuotaChange?.(q); });
-    return () => { alive = false; };
-  }, [open]);
-
   const handlePay = async (off: (typeof OFFERS)[number]) => {
     if (autoPay) { await startAutoPay(off); return; }
     setPaying(off.id);
