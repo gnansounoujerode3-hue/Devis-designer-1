@@ -68,7 +68,10 @@ export default function LegalModal({ open, onClose, initialTab }: Props) {
                     glissante de 30 jours. La création et la consultation des documents restent illimitées.</li>
                   <li>Abonnement mensuel : 2 000 F CFA / mois.</li>
                   <li>Abonnement 1 an : 15 000 F CFA.</li>
-                  <li>Design personnalisé : 5 000 F CFA (paiement unique).</li>
+                  <li>Design personnalisé : 5 000 F CFA (paiement unique). Le design est livré en fichier
+                    (<code>.dddesign.js</code>) que l'utilisateur importe dans l'application — carte « Importer mon
+                    design » — et ce paiement inclut 1 mois d'exports illimités. L'utilisateur peut conserver
+                    jusqu'à 6 designs importés et les remplacer par une version corrigée.</li>
                   <li>Tous les designs pendant 1 an : 50 000 F CFA.</li>
                   <li>
                     Parrainage : chaque parrainage valide ouvre droit à <b>1 mois d'abonnement offert pour le parrain</b>{' '}

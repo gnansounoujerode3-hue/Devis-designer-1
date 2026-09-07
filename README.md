@@ -156,14 +156,25 @@ devis-designer/
 ├── tsconfig.json       # TypeScript strict
 ├── backend/
 │   └── worker.js       # Serveur : codes d'activation, quota d'exports, parrainage (Cloudflare Worker)
-└── src/
+├── scripts/
+│   ├── design-pack.ts  # Le packager du vendeur : npm run design:pack -- <mon.tsx> --name="…"
+│   └── design-example.tsx  # Gabarit de modèle commenté (contrat du fichier livré)
+├── tests/
+│   ├── run.mjs         # Lanceur de suites (esbuild + shim DOM, sortie code 1 si échec)
+│   ├── shim.js         # localStorage/document/window minimaux pour rendre du React sous Node
+│   ├── design_test.tsx # Tout le trajet du design personnalisé (67 assertions)
+│   ├── landing_test.tsx# Vérité des copies de la page d'accueil (40 assertions)
+│   └── fixtures/       # Modèles de test (probe-a, probe-b, hooks) packés comme de vrais fichiers
+└── src/                # (designs/*.dddesign.js : artefacts livrés aux clients, hors Git)
     ├── main.tsx        # Bootstrap React
     ├── App.tsx         # Composant racine
     ├── components/     # LandingPage (accueil public), Paywall, Espace vendeur (VendorPage),
-    │                 # FAQ, Legal, Onboarding...
-    ├── templates/      # Les 12 templates SVG
+    │                   # CustomDesignCard (import du fichier), FAQ, Legal, Onboarding...
+    ├── templates/      # Les 12 templates SVG + index.ts (registre, + les designs importés)
     ├── lib/            # route (accueil ↔ app), license (codes émis en local),
     │                   # quota (compteur serveur), referral (parrainage),
+    │                   # designSecret (format .dddesign.js + HMAC),
+    │                   # customDesign (les 6 emplacements du client),
     │                   # adminKey (clé ADMIN_PASS), config, store...
     ├── store.ts        # Persistance localStorage + sauvegarde JSON
     ├── types.ts        # Types partagés
@@ -177,7 +188,7 @@ devis-designer/
 | Gratuit | 0 F | **20 exports PDF / envois signature** par appareil sur 30 jours glissants, comptés par le serveur (la création de devis reste libre) — voir [Quota anti navigation privée](#-quota-dexports-anti-navigation-privée) |
 | Abonnement mensuel | 2 000 F / mois | Exports illimités pendant 1 mois (cumulable) |
 | Abonnement 1 an | 15 000 F / an | Exports illimités pendant 1 an |
-| Design personnalisé | 5 000 F | Un design sur mesure pour votre template (paiement unique) |
+| Design personnalisé | 5 000 F | Le vendeur crée une mise en page à vos couleurs et la livre **en fichier** (`.dddesign.js`) à importer dans l'app ; **1 mois d'exports illimités inclus** (paiement unique). Jusqu'à 6 designs importés à la fois. |
 | TOUS les designs (1 an) | 50 000 F / an | N'importe quel design de template gratuit pendant 1 an + exports illimités |
 | **Parrainage** | 0 F | **1 mois offert au parrain** par parrainage valide (max. 12 mois / 12 mois glissants) |
 
@@ -337,12 +348,18 @@ Si le CLI demande sur quel site pousser : `npx netlify-cli link` → choisissez 
 <https://app.netlify.com/drop>. Sur un site déjà connecté à Git, laissez Netlify builder
 (build command `npm run build`, publish directory `dist`).
 
-**Vérifier que c'est bien la nouvelle version qui tourne** : le pied de page affiche
-`Devis Designer · Version X.Y.Z` (constante `APP_VERSION` de `src/lib/config.ts`) et
-l'en-tête de `#/vendeur` ajoute la marque de build (`BUILD_TAG`). **Incrémentez
-`APP_VERSION` à chaque publication** : après déploiement, rechargez en dur
+**Vérifier que c'est bien la nouvelle version qui tourne** — deux sondes, une par service :
+
+| Quoi | Où lire | Valeur attendue aujourd'hui |
+|---|---|---|
+| Le front (Netlify) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.2.0` |
+| Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-07 (quota + parrainage serveur + DESIGN = design + 1 mois d'exports)` |
+
+**Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
+`backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé).
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 114 assertions
+vertes avant de pousser, dont les textes de la page d'accueil, des CGU et du `index.html`.
 
 ### Option 3 — Hébergement classique (OVH, Hostinger, etc.)
 - Téléversez `dist/index.html` (et le dossier `dist/` entier) sur votre espace web

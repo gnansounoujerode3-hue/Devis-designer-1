@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TEMPLATES } from '../templates';
 
 interface Props {
   open: boolean;
@@ -9,7 +10,7 @@ const STEPS = [
   {
     icon: 'D',
     title: 'Bienvenue sur Devis Designer',
-    text: "Créez des devis et factures professionnels en quelques minutes. Choisissez parmi 12 templates, ajoutez votre logo, vos conditions et vos signatures.",
+    text: `Créez des devis et factures professionnels en quelques minutes. Choisissez parmi les ${TEMPLATES.length} modèles, ajoutez votre logo, vos conditions et vos signatures.`,
   },
   {
     icon: '+',

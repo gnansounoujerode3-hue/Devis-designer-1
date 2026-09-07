@@ -45,7 +45,7 @@ export const VENDOR_PIN = '2468';
    ------------------------------------------------------------------ */
 export const APP_VERSION = '1.2.0';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'import de design personnalisé (.dddesign.js signé) + DESIGN = 1 mois d\'exports (2026-09-07)';
+export const BUILD_TAG = 'jusqu\'à 6 designs importés (emplacements numérotés) + suites de tests dans le dépôt (2026-09-07)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).

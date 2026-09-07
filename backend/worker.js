@@ -22,7 +22,7 @@ export default {
       /* ---- 0. DIAGNOSTIC (ouverture dans le navigateur) ---- */
       if (path === '/debug' && request.method === 'GET') {
         const out = {
-          version: '2026-09-06 (quota + parrainage serveur)',
+          version: "2026-09-07 (quota + parrainage serveur + DESIGN = design + 1 mois d'exports)",
           secretKeysCount: Object.keys(getSecretKeys(env)).length,
           adminPassSet: getAdminPass(env) !== 'change-me',
           /* Contrôles de déploiement : si ces lignes manquent, l'app retombe en local. */

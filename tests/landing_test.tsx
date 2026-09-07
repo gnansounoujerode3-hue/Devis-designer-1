@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LandingPage from '../src/components/LandingPage';
 import { APP_VERSION } from '../src/lib/config';
-import { FREE_EXPORT_LIMIT, PRICE_ANNUAL, PRICE_CUSTOM_DESIGN, PRICE_MONTHLY } from '../src/lib/license';
+import { FREE_EXPORT_LIMIT, PRICE_ALL, PRICE_ANNUAL, PRICE_CUSTOM_DESIGN, PRICE_MONTHLY } from '../src/lib/license';
 import { TEMPLATES } from '../src/templates';
 
 let pass = 0, fail = 0;
@@ -97,6 +97,24 @@ const card = readFileSync(src('src/components/CustomDesignCard.tsx'), 'utf8');
 ok(/Importer mon design/.test(card), 'le bouton « Importer mon design » existe bien dans l’app');
 ok(/\.dddesign\.js/.test(card), 'la carte client nomme le format reçu du vendeur');
 ok(readFileSync(src('src/templates/index.ts'), 'utf8').includes('allTemplates'), 'les modèles affichés viennent du registre réel de l’app');
+
+/* ---------- 6. Le HTML de la page (t\u00eate + JSON-LD) et les CGU ---------- */
+const head = readFileSync(src('index.html'), 'utf8');
+const ldRaw = /application\/ld\+json">([\s\S]*?)<\/script>/.exec(head);
+ok(!!ldRaw, 'index.html porte un bloc JSON-LD');
+if (ldRaw) {
+  const ld = JSON.parse(ldRaw[1]) as { offers?: Array<{ name: string; price: string; priceCurrency: string }> };
+  const prices = (ld.offers || []).map(o => Number(o.price)).sort((a, b) => a - b);
+  const real = [0, PRICE_MONTHLY, PRICE_ANNUAL, PRICE_CUSTOM_DESIGN, PRICE_ALL].sort((a, b) => a - b);
+  ok(JSON.stringify(prices) === JSON.stringify(real), 'les prix annonc\u00e9s aux moteurs sont les prix r\u00e9els', JSON.stringify(prices));
+  ok((ld.offers || []).every(o => o.priceCurrency === 'XOF'), 'devise XOF partout');
+}
+ok(head.includes(TEMPLATES.length + ' mod\u00e8les'), 'la description m\u00e9ta cite le vrai nombre de mod\u00e8les');
+const cgu = readFileSync(src('src/components/LegalModal.tsx'), 'utf8');
+const designClause = cgu.slice(cgu.indexOf('Design personnalis'), cgu.indexOf('Design personnalis') + 700);
+ok(/5 000 F CFA/.test(designClause) && /1 mois d'exports illimit\u00e9s/.test(designClause), 'les CGU disent ce que le design inclut');
+ok(/importer|importe/.test(designClause) && /6 designs/.test(designClause), 'les CGU d\u00e9crivent la livraison par fichier et la limite');
+ok(!/\.tsx/.test(designClause), 'les CGU ne promettent pas d\u2019ex\u00e9cuter du .tsx');
 
 console.log(`\nPAGE D'ACCUEIL : ${pass} réussis, ${fail} échoués`);
 if (fail) process.exit(1);
