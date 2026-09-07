@@ -43,7 +43,7 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
 export const BUILD_TAG = 'import de design personnalisé (.dddesign.js signé) + DESIGN = 1 mois d\'exports (2026-09-07)';
 

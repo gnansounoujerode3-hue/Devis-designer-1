@@ -1,6 +1,6 @@
 import { DocType, QuoteData, QuoteItem, SavedClient } from './types';
 import { getExportCount, setExportCountAtLeast } from './lib/license';
-import { adoptDesignBlob, designBlobForBackup } from './lib/customDesign';
+import { adoptDesignBlobs, designBlobsForBackup } from './lib/customDesign';
 
 const DOCS_KEY = 'devis_designer_docs';
 const CLIENTS_KEY = 'devis_designer_clients';
@@ -230,10 +230,12 @@ export interface BackupData {
   /** Nombre d'exports déjà consommés sur l'appareil qui a exporté la sauvegarde. */
   exportCount?: number;
   /**
-   * Design personnalisé du client (fichier signé, texte brut) : sans lui, un
-   * changement de poste ferait perdre le modèle payé 5 000 F. Il est revérifié
-   * à la restauration, donc un fichier édité à la main est rejeté.
+   * Designs personnalisés du client (fichiers signés, texte brut) : sans eux, un
+   * changement de poste ferait perdre les modèles payés 5 000 F pièce. Chacun est
+   * revérifié à la restauration, donc un fichier édité à la main est rejeté.
    */
+  customDesigns?: (string | null)[];
+  /** @deprecated avant l'époque « plusieurs designs » : un seul blob. */
   customDesign?: string;
 }
 
@@ -246,7 +248,7 @@ export function exportAllData(): BackupData {
     docs: loadAllDocs(),
     clients: loadClients(),
     exportCount: getExportCount(),
-    customDesign: designBlobForBackup(),
+    customDesigns: designBlobsForBackup(),
   };
 }
 
@@ -300,12 +302,14 @@ export function importAllData(json: string, mode: 'merge' | 'replace' = 'merge')
        (un blob falsifié ne s'installe simplement pas). En mode « remplacer », un
        design déjà présent sur l'appareil est conservé si la sauvegarde n'en
        contient pas : on n'efface pas un modèle payé à l'occasion d'un import. */
-    function restoreDesign(blob: unknown): string {
-      if (typeof blob !== 'string' || !blob.trim()) return '';
-      void adoptDesignBlob(blob).then(ok => { if (!ok) console.warn('Design personnalisé non restauré : signature invalide.'); });
-      return ' Votre design personnalisé est restauré aussi.';
+    function restoreDesign(blobs: unknown, legacy?: unknown): string {
+      const list = Array.isArray(blobs) ? blobs : (typeof legacy === 'string' && legacy.trim() ? [legacy] : []);
+      if (!list.length) return '';
+      void adoptDesignBlobs(list, mode === 'replace' ? 'exact' : 'append')
+        .then(n => { if (!n) console.warn('Aucun design personnalisé restauré (signatures invalides).'); });
+      return ` ${list.length} design(s) personnalisé(s) restauré(s) aussi (vérification des signatures en cours).`;
     }
-    const designNote = restoreDesign(data.customDesign);
+    const designNote = restoreDesign(data.customDesigns, data.customDesign);
 
     if (mode === 'replace') {
       saveAllDocs(incomingDocs);

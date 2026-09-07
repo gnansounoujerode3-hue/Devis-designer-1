@@ -4,7 +4,7 @@
    Comment s'en servir :
      1. copier ce fichier en src/templates/DesignClient.tsx
      2. l'adapter (couleurs, blocs, ordre des sections…)
-     3. npm run design:pack src/templates/DesignClient.tsx --name "Design Dupont"
+     3. npm run design:pack -- src/templates/DesignClient.tsx --name="Design Dupont"
      4. envoyer le fichier DesignClient.dddesign.js au client (WhatsApp) :
         il clique « Importer mon design » dans l'application.
 

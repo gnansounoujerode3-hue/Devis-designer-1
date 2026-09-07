@@ -20,7 +20,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Comment se passe le design personnalisé à 5 000 F ?',
-    a: `Vous payez, l'offre s'active avec votre code (et un mois d'exports illimités est ajouté par la même occasion). Ensuite, décrivez au vendeur ce que vous voulez (couleurs, logo, disposition) sur WhatsApp. Il prépare le modèle chez lui et vous envoie un fichier .dddesign.js. Vous ouvrez l'application, bouton « PRO » puis carte « Importer mon design », vous choisissez le fichier : il est vérifié (un fichier modifié est refusé), puis rangé sur votre appareil. Votre design apparaît alors dans l'onglet STYLE, comme un modèle — à vous seul, les autres utilisateurs ne le voient pas. Si vous changez de poste, la copie JSON que vous exportez l'emporte avec lui.`,
+    a: `Vous payez, l'offre s'active avec votre code (et un mois d'exports illimités est ajouté par la même occasion). Ensuite, décrivez au vendeur ce que vous voulez (couleurs, logo, disposition) sur WhatsApp. Il prépare le modèle chez lui et vous envoie un fichier .dddesign.js. Vous ouvrez l'application, bouton « PRO » puis carte « Importer mon design », vous choisissez le fichier : il est vérifié (un fichier modifié est refusé), puis rangé sur votre appareil. Votre design apparaît alors dans l'onglet STYLE, comme un modèle — à vous seul, les autres utilisateurs ne le voient pas. Vous pouvez en importer jusqu'à 6 à la fois (bouton « Ajouter un autre design »), et en remplacer un sans perdre les devis déjà rédigés avec. Si vous changez de poste, la copie JSON que vous exportez l'emporte avec lui.`,
   },
   {
     q: 'Quels sont les prix ?',

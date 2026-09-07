@@ -397,12 +397,13 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
                 adaptez-le, puis emballez :
               </p>
               <div className="mt-2 px-3 py-2 rounded-lg bg-[#0B1220] text-[10.5px] font-mono text-green-300 overflow-x-auto whitespace-nowrap">
-                npm run design:pack src/templates/DesignClient.tsx --name "Design Dupont"
+                npm run design:pack -- src/templates/DesignClient.tsx --name="Design Dupont"
               </div>
               <p className="mt-2 text-[11px] leading-relaxed text-[#777] dark:text-zinc-400">
                 Envoyez ensuite le fichier <b>DesignClient.dddesign.js</b> obtenu (WhatsApp, 7 ko environ) :
-                le client l'importe, et le modèle n'apparaît que chez lui. Gardez le <b>.tsx</b> — c'est votre
-                archive, et une correction passe par un nouveau fichier.
+                le client l'importe, et le modèle n'apparaît que chez lui (il peut en garder jusqu'à 6).
+                Gardez le <b>.tsx</b> : c'est votre archive, et une correction passe par un nouveau fichier
+                qu'il place sur le même emplacement — ses devis déjà rédigés suivent la version.
               </p>
             </div>
           )}

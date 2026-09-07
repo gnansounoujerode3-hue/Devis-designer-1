@@ -11,7 +11,7 @@ import TemplateCorporate from './TemplateCorporate';
 import TemplateModernOrange from './TemplateModernOrange';
 import TemplateCleanGradient from './TemplateCleanGradient';
 import { BuiltinTemplateId, TemplateId, TemplateInfo } from '../types';
-import { customTemplateInfo, getInstalledDesign, onDesignChange } from '../lib/customDesign';
+import { customTemplateInfos, onDesignChange, resolveCustomTemplate } from '../lib/customDesign';
 
 export const TEMPLATES: TemplateInfo[] = [
   { id: 'modern',    name: 'Modern',     description: 'Swiss contemporain, bandeau coloré' },
@@ -43,18 +43,20 @@ export const TEMPLATE_COMPONENTS: Record<BuiltinTemplateId, typeof TemplateModer
   cleangradient: TemplateCleanGradient,
 };
 
-/** Les modèles proposés au client : les 12 embarqués + le design importé, s'il y en a un. */
+/** Les modèles proposés au client : les 12 embarqués + ses designs importés, s'il y en a. */
 export function allTemplates(): TemplateInfo[] {
-  const mine = customTemplateInfo();
-  return mine ? [...TEMPLATES, mine] : TEMPLATES;
+  const mine = customTemplateInfos();
+  return mine.length ? [...TEMPLATES, ...mine] : TEMPLATES;
 }
 
-/** Composant d'un modèle (importé ou embarqué). 'custom' retombe sur Modern si le fichier a été retiré. */
+/**
+ * Composant d'un modèle (importé ou embarqué). Un id « custom-n » dont le fichier a
+ * été retiré retombe sur Modern : un document rédigé avec un design disparu continue
+ * de s'afficher (et de s'exporter) au lieu de faire un écran blanc.
+ */
 export function resolveTemplate(id: TemplateId): typeof TemplateModern {
-  if (id === 'custom') {
-    const d = getInstalledDesign();
-    if (d) return d.component as unknown as typeof TemplateModern;
-  }
+  const custom = resolveCustomTemplate(id);
+  if (custom) return custom as unknown as typeof TemplateModern;
   return TEMPLATE_COMPONENTS[id as BuiltinTemplateId] || TEMPLATE_COMPONENTS.modern;
 }
 

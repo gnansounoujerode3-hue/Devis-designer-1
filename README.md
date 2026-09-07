@@ -24,8 +24,11 @@ npm run preview    # prévisualiser le build
 - **Édition directe** : toucher/cliquer un texte sur l'aperçu pour le modifier (n'importe quel texte)
 - **Signatures** manuscrites (émetteur + client), envoi pour signature
 - **Export** : PDF (A4 multipages), SVG, présentation plein écran
-- **Sauvegarde / restauration** JSON (export/import de tous les devis + clients)
-  Voir plus bas « Design personnalisé : fabriquer et livrer le fichier » pour la livraison du fichier.
+- **Sauvegarde / restauration** JSON (export/import de tous les devis + clients, designs
+  importés compris)
+- **Design personnalisé** : le vendeur livre un fichier `.dddesign.js`, le client l'importe ;
+  jusqu'à 6 modèles importés coexistent chez lui. Voir plus bas « Design personnalisé
+  (5 000 F) : fabriquer et livrer le fichier » et les suites `npm run test:ui`.
 - **Monétisation intégrée** : 20 exports gratuits par appareil sur 30 jours glissants (comptés par
   le Worker — voir plus bas), abonnements 2000 F/mois, 15 000 F/an, design personnalisé 5 000 F,
   tous les designs 50 000 F/an (activation automatique après paiement, code en secours)
@@ -46,10 +49,27 @@ fabriquez et qu'il importe**. Aucun redéploiement, aucun compte, aucun serveur 
 | 1 | Client | Paie (caisse automatique Chariow, ou Mobile Money + votre numéro). L'offre s'active, un mois d'exports avec. |
 | 2 | Client | Bouton **« PRO »** → carte **« Importer mon design »** → *pas encore de fichier* → il vous écrit sur WhatsApp (`VENDOR.WHATSAPP`) pour décrire ce qu'il veut. |
 | 3 | **Vous** | `cp scripts/design-example.tsx src/templates/DesignDupont.tsx`, vous adaptez la mise en page. |
-| 4 | **Vous** | `npm run design:pack src/templates/DesignDupont.tsx --name "Design Dupont" --desc "Bloc client en bandeau" --author "Atelier Kpodé"` → écrit `src/templates/DesignDupont.dddesign.js` (≈ 7 ko). |
+| 4 | **Vous** | `npm run design:pack -- src/templates/DesignDupont.tsx --name="Design Dupont" --desc="Bloc client en bandeau" --author="Atelier Kpodé"` → écrit `src/templates/DesignDupont.dddesign.js` (≈ 7 ko). |
 | 5 | **Vous** | Envoyez ce fichier `.dddesign.js` au client (WhatsApp, email, clé USB : c'est un fichier comme un autre). |
-| 6 | Client | Carte « Importer mon design » → *Choisir le fichier reçu* (ou il colle son contenu). Le modèle apparaît dans l'onglet **STYLE**, à lui seul. |
-| 7 | Vous (si correction) | Vous modifiez le `.tsx`, vous re-packez, vous renvoyez le fichier ; il clique « Remplacer par un nouveau fichier ». |
+| 6 | Client | Carte « Importer mon design » → *Choisir le fichier reçu* (ou il colle son contenu). Le modèle apparaît dans l'onglet **STYLE**, à lui seul. Jusqu'à **6 designs** importés peuvent coexister (« Ajouter un autre design »). |
+| 7 | Vous (si correction) | Vous modifiez le `.tsx`, vous re-packez, vous renvoyez le fichier ; il clique **Remplacer** sur la ligne concernée. L'emplacement garde son numéro, donc tous les devis déjà rédigés avec ce design basculent sur la nouvelle version. |
+
+**Plusieurs designs chez un même client** : chaque fichier occupe un *emplacement* numéroté
+de 1 à 6. Le premier s'appelle `custom` (nom historique), les suivants `custom-2` …
+`custom-6` — c'est ce numéro que porte `QuoteData.templateId`. D'où trois règles :
+**remplacer** un emplacement ne change pas son identifiant (les documents existants suivent),
+**ajouter** prend le premier emplacement libre, et au-delà de 6 l'import est refusé avec le
+mode d'emploi (« retirez-en un »). Dans la sauvegarde JSON, `customDesigns` est un tableau
+**positionnel** : `[blob, null, blob]` = emplacements 1 et 3 ; un trou se note `null` pour que
+chaque design retrouve son numéro. Un devis dont l'emplacement est devenu vide se rend avec un
+modèle embarqué, jamais avec un écran blanc.
+
+**Côté commande** : le `--` après `design:pack` n'est pas décoratif. La forme
+`npm run design:pack <fichier> --name "A B"` ne marche pas : npm garde `--name` pour lui et ne
+rend que les mots d'après, ce qui étiquetterait le fichier avec le nom du fichier. Le packer s'en
+aperçoit et refuse au lieu de livrer un design mal nommé. Bonne forme (les deux styles
+`--name=valeur` et `--name valeur` sont alors acceptés) :
+`npm run design:pack -- src/templates/DesignDupont.tsx --name="Design Dupont"`.
 
 **Le fichier** : en-tête signé (JSON des métadonnées + HMAC-SHA256 en fin de fichier), puis le
 code du modèle en CommonJS, `react` et `react/jsx-runtime` laissés **externes** — c'est
@@ -76,6 +96,25 @@ client, il n'est donc pas visible des autres utilisateurs — mais il n'est pas 
 protection contre un attaquant déterminé. Le `#/vendeur` reste le seul endroit où vous
 émettez les codes ; la liste des designs livrés, elle, vit dans le `localStorage` du client —
 gardez une copie de vos `.tsx` (c'est votre archive).
+
+## Vérifier sans ouvrir le navigateur
+
+```bash
+npm run test:ui          # ou : npm test
+```
+
+Deux suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
+le TSX avec un shim DOM minimal — `tests/shim.js` — et laisse `react`/`react-dom` imports de
+`node_modules`, donc le harness rend avec le même React que l'app) :
+
+| Suite | Ce qu'elle tient |
+| --- | --- |
+| `tests/design_test.tsx` | Tout le trajet du design sur mesure : pack du vendeur → fichier signé → refus des fichiers modifiés, tronqués, trop gros → import → **rendu par le vrai `QuoteSVG`** → emplacements 1 à 6 (ajout, remplacement, plafond, retrait) → sauvegarde JSON et restauration (avec blob falsifié) → code d'activation `DESIGN` → carte d'import dans les deux états. Les gabarits testés sont dans `tests/fixtures/`. |
+| `tests/landing_test.tsx` | La page d'accueil se rend ; ses chiffres viennent des constantes (`PRICE_*`, `FREE_EXPORT_LIMIT`, `TEMPLATES.length`) et non de nombres recopiés ; aucune promesse interdite (mode hors-ligne, téléchargement, témoignages et étoiles inventés, ancien forfait de 3 mois, avoir) ; aucun emoji ; chaque mention du réseau dit la vérité. |
+
+Une suite sort en code 1 si elle échoue, donc `npm test` a sa place dans une CI. Le réflexe qui
+les garde vivantes : changez un comportement, écrivez l'assertion **avant**, elle doit rougir
+puis verdir.
 
 ## Page d'accueil publique (landing)
 
@@ -369,7 +408,7 @@ sauvegarde JSON, donc « navigation privée + réimport » suffisait.
 | **A — le serveur tient le compteur** | Avant chaque PDF / envoi signature, l'app appelle `POST /quota/reserve`. Le Worker compte sur **l'empreinte de l'appareil** (signaux non effacés par la navigation privée : userAgent, langue, plateforme, cœurs, écran, fuseau horaire…) **et** sur le code d'installation, en retenant le **max des deux seaux** sur une fenêtre glissante de 30 jours. Une nouvelle « installation » ne remet donc rien à zéro. |
 | **Blocage dur** | Au-delà du plafond, l'export est refusé (paywall), **sauf** déblocage accordé par le vendeur. Un échec de génération restitue la place (`/quota/release`), le refus n'aggrave pas le compteur. |
 | **Déblocage en 1 clic** | Le client bloque → bouton « Vous êtes un nouveau client ? » dans le paywall → `POST /quota/request`. Vous voyez la demande dans `#/vendeur` (panneau **QUOTA D'EXPORTS & DÉBLOCAGES** : empreinte, note du client, IP/pays, compteur) et vous cliquez sur *Débloquer 30 j / 7 j / 1 j*. Le client n'a rien à faire d'autre : le déblocage suit l'**empreinte**, pas l'installation. |
-| **Hors-ligne** | Worker injoignable ⇒ l'app retombe sur son compteur local. Un client légitime sans réseau n'est **jamais** bloqué à cause du serveur. |
+| **Worker injoignable** | Si le service de quota ne répond pas, l'app retombe sur son compteur local : un client légitime n'est jamais bloqué à cause du réseau. (Ce n'est pas un mode hors-ligne : sans connexion, la page ne se charge déjà pas.) |
 | **Abonnés** | Une licence active court directement : aucun appel `/quota/*` n'est émis pour elle. |
 
 ### Réglages

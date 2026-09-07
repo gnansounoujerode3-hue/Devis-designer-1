@@ -100,9 +100,12 @@ export interface SavedClient {
   address: string;
 }
 
-/** Les 12 modèles embarqués… plus « custom » : le design sur mesure importé par le client. */
+/**
+ * Les 12 modèles embarqués, plus les designs sur mesure importés par le client :
+ * « custom » = 1er emplacement (nom historique), « custom-2 » … « custom-6 » ensuite.
+ */
 export type BuiltinTemplateId = 'modern' | 'classic' | 'minimal' | 'creative' | 'studio' | 'architect' | 'adapted' | 'minimalist' | 'purple' | 'corporate' | 'modernorange' | 'cleangradient';
-export type TemplateId = BuiltinTemplateId | 'custom';
+export type TemplateId = BuiltinTemplateId | 'custom' | `custom-${number}`;
 
 export interface TemplateInfo {
   id: TemplateId;
