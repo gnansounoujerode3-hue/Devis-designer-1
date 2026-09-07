@@ -40,7 +40,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Comment payer ?',
-    a: `Bouton « PRO » (ou « X EXPORTS GRATUITS » en haut), choisissez l'offre et payez par Mobile Money (MTN MoMo, Orange Money, Wave, Moov) dans la caisse sécurisée. Dès que le paiement est confirmé, l'abonnement s'active automatiquement : aucun code à taper. Si la caisse est injoignable, payez au ${VENDOR.PHONE} et le vendeur vous transmet un code d'activation.`,
+    a: `Bouton « PRO » (ou « X EXPORTS GRATUITS » en haut), choisissez l'offre et payez par Mobile Money (MTN MoMo, Orange Money, Wave, Moov) dans la caisse sécurisée Chariow. Dès que le paiement est confirmé, l'abonnement s'active automatiquement : aucun code à taper. Si la caisse est injoignable, payez au ${VENDOR.PHONE} et le vendeur vous transmet un code d'activation.`,
   },
   {
     q: 'Comment activer mon abonnement ?',

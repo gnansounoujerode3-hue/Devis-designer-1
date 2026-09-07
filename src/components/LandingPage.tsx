@@ -199,7 +199,7 @@ export default function LandingPage() {
 
   const offers: Array<{ name: string; amount: string; note?: string; desc: string; best?: boolean }> = [
     { name: 'Découverte', amount: '0 F', note: `${FREE_EXPORT_LIMIT} exports offerts`, desc: `${FREE_EXPORT_LIMIT} exports par appareil sur 30 jours, tous les modèles inclus. Sans carte bancaire, sans engagement.` },
-    { name: 'Abonnement 1 mois', amount: price(PRICE_MONTHLY), desc: 'Exports et envois en signature illimités pendant 1 mois. Code d’activation envoyé après paiement.' },
+    { name: 'Abonnement 1 mois', amount: price(PRICE_MONTHLY), desc: 'Exports et envois en signature illimités pendant 1 mois. L’offre s’active dès que le paiement est confirmé.' },
     { name: 'Abonnement 1 an', amount: price(PRICE_ANNUAL), note: 'soit 1 250 F/mois', desc: `12 mois d’exports illimités. ${price(PRICE_ANNUAL)} au lieu de ${price(PRICE_MONTHLY * 12)} : 9 000 F d’économie.`, best: true },
     { name: 'Design personnalisé', amount: price(PRICE_CUSTOM_DESIGN), desc: `Le vendeur crée une mise en page à vos couleurs, pour vous seul — et 1 mois d'exports illimités est inclus. Vous recevez le design en fichier, à importer dans l'application.` },
     { name: 'Tous les designs · 1 an', amount: price(PRICE_ALL), desc: 'N’importe quel modèle gratuit pendant 1 an, exports illimités inclus.' },
@@ -209,7 +209,7 @@ export default function LandingPage() {
     { q: 'Faut-il installer quelque chose ?', a: 'Non. Devis Designer est un site web : vous l’ouvrez dans le navigateur de l’ordinateur ou du téléphone, et le document se met en page immédiatement. En revanche, il faut une connexion internet pour l’ouvrir — l’application ne fonctionne pas hors connexion.' },
     { q: 'Où sont mes documents ?', a: 'Sur votre appareil, dans le stockage du navigateur. Ils ne sont envoyés à aucun serveur. Pensez à exporter régulièrement « Exporter une copie » : c’est ce fichier qui vous permet de tout retrouver après un changement d’ordinateur ou un nettoyage du navigateur.' },
     { q: 'Combien de devis puis-je faire gratuitement ?', a: `${FREE_EXPORT_LIMIT} exports (PDF, image ou envoi en signature) par appareil et par période de 30 jours. Vous pouvez vous abonner, ou demander à un ami de vous parrainer. Au-delà, le compte est réellement tenu par le serveur du vendeur : la navigation privée ne remet pas le compteur à zéro.` },
-    { q: 'Comment ça se passe pour payer ?', a: 'Vous payez par Mobile Money au numéro du vendeur, puis vous recevez un code d’activation à saisir dans l’application. Le paiement ne se renouvelle pas tout seul : l’accès s’arrête à l’échéance, sans prélèvement automatique.' },
+    { q: 'Comment ça se passe pour payer ?', a: 'Dans l’application : bouton « PRO », vous choisissez l’offre, vous cliquez sur « Payer ». La caisse de paiement en ligne s’ouvre (Chariow : MTN MoMo, Orange Money, Wave, Moov) et l’offre s’active toute seule dès que le paiement est confirmé — aucun code à recopier. En secours, si la caisse ne répond pas : paiement Mobile Money au numéro du vendeur, puis le code d’activation qu’il vous envoie à saisir dans « Activer ». Dans les deux cas, le paiement ne se renouvelle pas tout seul : l’accès s’arrête à l’échéance, sans prélèvement automatique.' },
     { q: 'Et si je change d’ordinateur ?', a: 'Exportez une copie JSON depuis l’ancien poste (« Sauvegarder »), réimportez-la sur le nouveau. Le compteur d’exports est transféré avec la copie, pour ne pas repartir de zéro ni repartir sans limite.' },
   ];
 
@@ -269,7 +269,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap gap-2 mb-6">
               <Chip dark={dark}>{FREE_EXPORT_LIMIT} exports offerts</Chip>
               <Chip dark={dark} tone="neutral">Aucune installation</Chip>
-              <Chip dark={dark} tone="green">Paiement Mobile Money</Chip>
+              <Chip dark={dark} tone="green">Paiement Mobile Money en ligne</Chip>
             </div>
             <h1 className={`text-[34px] sm:text-[52px] font-extrabold tracking-[-0.02em] leading-[1.05] ${ink}`}>
               Vos devis et vos factures <span style={{ color: ACCENT }}>aussi soignés</span> que votre travail.
@@ -416,8 +416,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-[1180px] px-4 sm:px-6 py-16 sm:py-24">
           <SectionTitle
             kicker="Tarifs"
-            title="Commencez gratuitement. Le reste, c'est un code d'activation."
-            sub={`${FREE_EXPORT_LIMIT} exports offerts par appareil et par période de 30 jours. Ensuite, l'abonnement s'achète par Mobile Money auprès du vendeur : il n'y a ni prélèvement automatique, ni renouvellement forcé.`}
+            title="Commencez gratuitement. Le reste, ça se règle en ligne."
+            sub={`${FREE_EXPORT_LIMIT} exports offerts par appareil et par période de 30 jours. Ensuite, l'abonnement se paie dans l'application, via la caisse de paiement Chariow (MTN MoMo, Orange Money, Wave, Moov) : l'offre s'active dès que le paiement est confirmé. Il n'y a ni prélèvement automatique, ni renouvellement forcé.`}
             dark={dark}
           />
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -441,12 +441,29 @@ export default function LandingPage() {
               </div>
             ))}
             <div className={`rounded-[20px] border p-6 flex flex-col ${card}`}>
-              <div className={`text-[12.5px] font-extrabold uppercase tracking-wider ${soft}`}>Où acheter</div>
-              <p className={`mt-3 text-[13.5px] leading-relaxed ${mute}`}>
-                Vous payez par Mobile Money au numéro du vendeur, vous recevez un code d'activation à saisir dans
-                l'application, et l'offre est aussitôt appliquée.
-              </p>
-              <div className={`mt-4 text-[13.5px] font-bold ${ink}`}>{VENDOR.PHONE}</div>
+              <div className={`text-[12.5px] font-extrabold uppercase tracking-wider ${soft}`}>Comment payer</div>
+              <ol className="mt-3 space-y-3">
+                {[
+                  {
+                    t: (<>Dans l'application : bouton <b className={ink}>« PRO »</b>, l'offre, puis <b className={ink}>« Payer »</b>. La caisse de paiement en ligne s'ouvre (Chariow : MTN MoMo, Orange Money, Wave, Moov) et l'offre s'active <b className={ink}>toute seule</b> dès le paiement confirmé — aucun code à recopier.</>),
+                  },
+                  {
+                    t: (<>
+                      <b className={ink}>Si la caisse ne répond pas</b> (à titre de secours) : paiement Mobile Money
+                      direct au <b className={ink}>{VENDOR.PHONE}</b>, vous envoyez la référence par WhatsApp et le
+                      vendeur vous transmet un code à coller dans « Activer ».
+                    </>),
+                  },
+                ].map((row, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="w-[22px] h-[22px] rounded-full shrink-0 mt-0.5 flex items-center justify-center text-[11px] font-extrabold text-white" style={{ background: ACCENT }}>
+                      {i + 1}
+                    </span>
+                    <p className={`text-[13.5px] leading-relaxed ${mute}`}>{row.t}</p>
+                  </li>
+                ))}
+              </ol>
+              <p className={`mt-4 text-[12px] ${soft}`}>Dans les deux cas : aucun prélèvement automatique, aucun renouvellement forcé.</p>
               <button
                 onClick={goApp}
                 className="mt-auto pt-0 h-11 rounded-xl text-white text-[14px] font-bold"

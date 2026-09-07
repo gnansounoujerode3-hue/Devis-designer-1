@@ -224,15 +224,33 @@ devis-designer/
 | TOUS les designs (1 an) | 50 000 F / an | N'importe quel design de template gratuit pendant 1 an + exports illimités |
 | **Parrainage** | 0 F | **1 mois offert au parrain** par parrainage valide (max. 12 mois / 12 mois glissants) |
 
-### Comment ça marche (sans serveur)
+### Les deux chemins de paiement (à ne pas mélanger)
 
 > ⚠️ « Sans serveur » veut dire : *la vérification des codes et le compteur peuvent
 > fonctionner sans backend*. **L'application, elle, a besoin d'internet** pour s'ouvrir
 > (c'est un site web servi par Netlify) — il n'y a pas de mode hors-ligne ni de PWA.
+
+**1. Le chemin normal — caisse Chariow, activation automatique** (c'est l'état actuel :
+`AUTO_PAY_WORKER_URL` pointe sur votre Worker, et `productIds.DESIGN` est activé) :
+
 1. Le client crée ses devis librement. Chaque **export PDF** ou **envoi pour signature** consomme 1 des 20 gratuits.
-2. Épuisé → le client paie via **Chariow** (Mobile Money : MTN MoMo, Orange Money, Wave, Moov — commission 15 %).
-3. Vous générez un **code d'activation** depuis la page vendeur réservée (voir « Espace vendeur » ci-dessous).
-4. Vous envoyez le code au client (1 clic WhatsApp depuis la page vendeur, ou SMS). Il le saisit dans « Déjà abonné ? » → licence activée immédiatement.
+2. Épuisé → bouton **« PRO »** → l'offre → **« Payer … activation auto »** : le Worker crée la vente
+   (`POST /checkout` → `api.chariow.com/v1/checkout`) et ouvre la caisse Chariow
+   (Mobile Money : MTN MoMo, Orange Money, Wave, Moov — commission 15 %).
+3. Pulse (webhook) confirme la vente → le Worker émet le code, l'app le relève (`/check`) et
+   l'applique **toute seule**. Le client n'a **aucun code à recopier**.
+
+**2. Le secours — virement Mobile Money direct + code saisi** (caisse injoignable, client
+sans compte MoMo, paiement en espèces, Worker hors service) :
+
+1. Le client vous paie `VENDOR.PHONE` (MTN/Orange/Wave/Moov ou espèces), il vous envoie la référence.
+2. Vous générez le **code d'activation** dans `#/vendeur` (voir « Espace vendeur »).
+3. Vous lui transmettez le code (1 clic WhatsApp). Il le saisit dans « Déjà abonné ? » → licence activée.
+
+> Ce deuxième chemin doit rester écrit comme **secours** partout où il apparaît (page
+> d'accueil, FAQ, `PaywallModal`) : présenté comme la voie normale, il fait croire au client
+> qu'il doit vous envoyer de l'argent et attendre — alors que la caisse active tout seule.
+> `npm run test:ui` le vérifie (« le numéro est encadré par la mention secours »).
 
 ### Personnalisation (`src/lib/config.ts`)
 - `VENDOR.PHONE` / `VENDOR.WHATSAPP` / `VENDOR.EMAIL` : vos coordonnées

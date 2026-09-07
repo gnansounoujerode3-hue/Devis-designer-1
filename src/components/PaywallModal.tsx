@@ -161,7 +161,7 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
       startPolling(data.purchaseId);
     } catch (e) {
       setAutoState('error');
-      setAutoMsg((e instanceof Error ? e.message : String(e)) + ' — Paiement manuel : ' + fmt(off.price) + ' via Mobile Money au ' + VENDOR.PHONE + '.');
+      setAutoMsg((e instanceof Error ? e.message : String(e)) + ' — À titre de secours : paiement Mobile Money de ' + fmt(off.price) + ' au ' + VENDOR.PHONE + ', puis code d\u2019activation.');
     }
   };
 
