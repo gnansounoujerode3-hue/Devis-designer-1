@@ -19,6 +19,7 @@ export default function LegalModal({ open, onClose, initialTab }: Props) {
 
   const appName = VENDOR.APP_NAME;
   const contact = `${VENDOR.PHONE} / ${VENDOR.EMAIL}`;
+  const site = VENDOR.DOWNLOAD_LINK.replace(/\/+$/, '');
 
   const Section = ({ n, title, children }: { n: string; title: string; children: React.ReactNode }) => (
     <div className="mb-4">
@@ -56,12 +57,15 @@ export default function LegalModal({ open, onClose, initialTab }: Props) {
                 exporter des devis et factures professionnels et de les faire signer.
               </Section>
               <Section n="2" title="Accès au service">
-                L'application fonctionne de manière autonome sur l'appareil de l'utilisateur (ordinateur ou téléphone)
-                après installation. Elle est accessible gratuitement, avec des fonctionnalités payantes décrites à l'article 3.
+                L'application est un service web accessible à l'adresse <a href={site} className="underline">{site}</a>,
+                sans installation ni téléchargement, sur ordinateur comme sur téléphone. Les documents sont créés et
+                conservés sur l'appareil de l'utilisateur. L'accès est gratuit, avec un quota d'exports et des
+                fonctionnalités payantes décrits à l'article 3.
               </Section>
               <Section n="3" title="Offres et tarifs">
                 <ul className="list-disc pl-4 space-y-0.5">
-                  <li>Version gratuite : 20 exports PDF / envois pour signature par installation.</li>
+                  <li>Version gratuite : 20 exports (PDF ou envoi pour signature) par appareil, sur une période
+                    glissante de 30 jours. La création et la consultation des documents restent illimitées.</li>
                   <li>Abonnement mensuel : 2 000 F CFA / mois.</li>
                   <li>Abonnement 1 an : 15 000 F CFA.</li>
                   <li>Design personnalisé : 5 000 F CFA (paiement unique).</li>
@@ -73,12 +77,17 @@ export default function LegalModal({ open, onClose, initialTab }: Props) {
                   </li>
                 </ul>
                 Les paiements sont effectués via la plateforme Chariow (Mobile Money : MTN MoMo, Orange Money, Wave, Moov)
-                ou selon les modalités communiquées par l'éditeur. L'activation se fait par un code d'activation transmis
-                à l'utilisateur après paiement.
+                ou selon les modalités communiquées par l'éditeur. L'abonnement est activé automatiquement dès la
+                confirmation du paiement ; à titre de secours, l'éditeur peut transmettre un code d'activation que
+                l'utilisateur saisit dans la fenêtre des offres.
               </Section>
               <Section n="4" title="Quota et abonnements">
-                En version gratuite, l'utilisateur dispose de 20 exports (PDF ou envoi pour signature) par installation.
-                Au-delà, un abonnement est requis. L'abonnement mensuel est reconductible ; l'abonnement annuel expire
+                En version gratuite, l'utilisateur dispose de 20 exports (PDF ou envoi pour signature) par appareil sur
+                30 jours glissants. Ce compteur est tenu par le serveur de l'éditeur à partir d'une empreinte technique
+                de l'appareil et du code d'installation : changer de navigateur, ouvrir une fenêtre de navigation privée,
+                effacer les données du site ou réimporter une sauvegarde ne le réinitialise pas. Au-delà du quota, un
+                abonnement est requis ; une demande de déblocage motivée peut être adressée à l'éditeur, qui l'accorde
+                ou la refuse à sa discrétion. L'abonnement mensuel est reconductible ; l'abonnement annuel expire
                 à la date indiquée. Les documents créés restent consultables et modifiables même après expiration de
                 l'abonnement ; seuls les nouveaux exports sont bloqués jusqu'au renouvellement.
                 Un parrainage est considéré comme valide lorsque le filleul a enregistré le code parrain dans
@@ -116,23 +125,39 @@ export default function LegalModal({ open, onClose, initialTab }: Props) {
                 Le responsable du traitement des données est {VENDOR.APP_NAME}, joignable au {contact}.
               </Section>
               <Section n="2" title="Données collectées">
-                L'application traite uniquement les données que l'utilisateur saisit lui-même : nom, coordonnées et
-                adresse de l'émetteur et du client, description des prestations, montants, signatures électroniques,
-                logo et préférences (couleurs, polices). Aucune donnée n'est collectée à l'insu de l'utilisateur.
+                Deux catégories de données sont traitées.
+                <br /><br />
+                <b>1. Les données de vos documents</b> — nom, coordonnées et adresse de l'émetteur et du client,
+                description des prestations, montants, signatures électroniques, logo et préférences (couleurs, polices) :
+                elles sont saisies par l'utilisateur et restent sur son appareil. Elles ne sont ni transmises, ni lues,
+                ni stockées par le serveur de l'éditeur.
+                <br /><br />
+                <b>2. Les données techniques de comptage</b> — une empreinte anonyme de l'appareil (hash de signaux comme
+                le navigateur, la langue, la résolution d'écran ou le fuseau horaire), le code d'installation de
+                l'application, le nombre d'exports réalisés et, pour les paiements, les références de la transaction.
+                Elles servent uniquement à appliquer le quota gratuit, à vérifier un abonnement et à valider le
+                parrainage. Elles sont envoyées au serveur de l'éditeur (Cloudflare Workers) uniquement lorsque
+                l'appareil est connecté.
               </Section>
-              <Section n="3" title="Stockage — données 100 % locales">
-                Toutes les données sont stockées exclusivement sur l'appareil de l'utilisateur (stockage local du
-                navigateur ou de l'application). Elles ne sont jamais transmises à un serveur, ni partagées avec des
-                tiers, ni utilisées à des fins publicitaires. L'utilisateur peut à tout moment les exporter (sauvegarde
-                JSON) ou les supprimer définitivement en effaçant les données de l'application.
+              <Section n="3" title="Stockage">
+                Les documents, clients, logos et signatures sont stockés exclusivement dans le navigateur de l'appareil
+                de l'utilisateur (localStorage et IndexedDB) : ils ne sont jamais transmis à un serveur et ne sont pas
+                partagés avec des tiers. Les données techniques de comptage sont conservées côté serveur le temps de la
+                période de quota (30 jours glissants) et de la validité des codes de licence, puis écrasées ; elles ne
+                sont utilisées à aucune autre fin, ni publicitaire, ni statistique revendue. L'utilisateur peut à tout
+                moment exporter ses documents (sauvegarde JSON) ou tout effacer en supprimant les données du site — pour
+                les mentions techniques côté serveur, il s'adresse à l'éditeur au {contact}.
               </Section>
               <Section n="4" title="Finalités">
-                Les données sont utilisées uniquement pour la création, la personnalisation, l'export et la signature
-                des devis et factures de l'utilisateur.
+                Les données sont utilisées uniquement pour : la création, la personnalisation, l'export et la signature
+                des devis et factures ; l'application du quota d'exports gratuits ; la délivrance et la vérification des
+                abonnements ; la gestion du parrainage et, le cas échéant, le traitement d'une demande de déblocage.
               </Section>
               <Section n="5" title="Conservation">
-                Les données sont conservées sur l'appareil jusqu'à leur suppression par l'utilisateur (suppression d'un
-                document, effacement des données de l'application ou désinstallation).
+                Les données de documents sont conservées sur l'appareil jusqu'à leur suppression par l'utilisateur
+                (suppression d'un document, effacement des données du site). Les compteurs techniques côté serveur sont
+                datés et oubliés à l'issue de la fenêtre glissante de 30 jours ; les demandes de déblocage restent
+                visibles par l'éditeur jusqu'à ce qu'il les traite, puis sont supprimées.
               </Section>
               <Section n="6" title="Droits de l'utilisateur">
                 Conformément au code du numérique (loi n°2017-20), l'utilisateur dispose d'un droit d'accès, de

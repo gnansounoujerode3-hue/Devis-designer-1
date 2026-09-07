@@ -3,7 +3,8 @@
    ------------------------------------------------------------
    Le compteur local (localStorage + IndexedDB) est remis à zéro par une
    fenêtre de navigation privée, un autre navigateur ou un autre appareil :
-   20 exports gratuits « par installation » deviennent 20 exports par session.
+   20 exports gratuits « par installation » deviennent 20 exports par session — et
+   le compteur local ne résiste pas à la navigation privée.
 
    Avec QUOTA_SERVER_ENFORCEMENT, la vérité est sur le Worker :
    1. AVANT de produire le PDF, l'app RÉSERVE un export (POST /quota/reserve) ;

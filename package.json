@@ -1,7 +1,7 @@
 {
   "name": "devis-designer",
   "private": true,
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Devis Designer — Générateur de devis et factures professionnels (application web)",
   "author": "Votre Nom",
   "type": "module",

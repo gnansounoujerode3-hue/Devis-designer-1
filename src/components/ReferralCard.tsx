@@ -46,7 +46,7 @@ export default function ReferralCard() {
         PARRAINAGE — {REF_REWARD_MONTHS} MOIS OFFERT{REF_REWARD_MONTHS > 1 ? 'S' : ''} PAR PARRAINAGE
       </div>
       <p className="text-[11px] text-[#888] mb-3">
-        Chaque ami qui installe l'app avec <b>votre</b> code et exporte au moins un document vous
+        Chaque ami qui ouvre l'app avec <b>votre lien</b> (ou saisit votre code) et exporte au moins un document vous
         offre <b className="text-emerald-600 dark:text-emerald-400">{REF_REWARD_MONTHS} mois gratuit{REF_REWARD_MONTHS > 1 ? 's' : ''}</b>
         {' '}(max. {REF_MAX_MONTHS_PER_YEAR} mois offerts par an). Le mois offert va au parrain : c'est la seule récompense de l'application.
       </p>

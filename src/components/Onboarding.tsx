@@ -19,7 +19,7 @@ const STEPS = [
   {
     icon: '!',
     title: 'Exports gratuits',
-    text: "Vous disposez de 20 exports PDF et envois pour signature gratuits. Ensuite, un abonnement à 2 000 F/mois ou 15 000 F/an débloque l'illimité. Seule récompense gratuite de l'app : le parrainage — 1 ami parrainé = 1 mois offert pour vous.",
+    text: "Vous disposez de 20 exports PDF et envois pour signature par appareil, valables sur 30 jours glissants. Ensuite, un abonnement à 2 000 F/mois ou 15 000 F/an débloque l'illimité. Seule récompense gratuite de l'app : le parrainage — 1 ami parrainé = 1 mois offert pour vous.",
   },
   {
     icon: 'S',

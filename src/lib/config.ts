@@ -18,8 +18,12 @@ export const VENDOR = {
   EMAIL: 'gnansounoujerode3@gmail.com',
   /** Nom de votre app / marque */
   APP_NAME: 'Devis Designer',
-  /** Lien de téléchargement de l'app (utilisé dans les messages de partage) */
-  DOWNLOAD_LINK: 'https://votre-lien-telechargement.com',
+  /**
+   * Lien public de l'app — c'est LUI qui part dans les messages de partage
+   * WhatsApp et dans les liens de parrainage (referralDownloadLink() y ajoute
+   * ?ref=VOTRE_CODE). À changer si vous déménagez le site.
+   */
+  DOWNLOAD_LINK: 'https://devisdesigner.netlify.app/',
 };
 
 /**
@@ -39,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.0.5';
+export const APP_VERSION = '1.0.6';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'quota serveur + clé vendeur (2026-09-07)';
+export const BUILD_TAG = 'textes à jour (FAQ, CGU, confidentialité) + lien de parrainage (2026-09-07)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).
@@ -84,10 +88,11 @@ export const REFERRAL_VIA_WORKER = true;
 export const QUOTA_SERVER_ENFORCEMENT = true;
 
 /* ------------------------------------------------------------------
-   Liens de paiement Chariow.
-   Créez un lien de paiement par produit dans votre tableau de bord
-   Chariow, puis collez l'URL ici. Si un lien est vide (''), le bouton
-   "Payer" affichera le numéro du vendeur à la place (paiement manuel).
+   Liens de paiement Chariow (facultatif depuis le paiement automatique).
+   Tant que AUTO_PAY_WORKER_URL est renseigné, ces liens ne servent plus :
+   le Worker crée la vente et ouvre la caisse. Gardez-les vides, ou collez un
+   lien de paiement Chariow par produit pour le secours (si le Worker tombe,
+   le bouton « Payer » affiche alors le numéro du vendeur = paiement manuel).
    ------------------------------------------------------------------ */
 export const CHARIOW_LINKS = {
   /** 2 000 F — abonnement 1 mois */

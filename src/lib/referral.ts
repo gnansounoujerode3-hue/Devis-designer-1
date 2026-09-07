@@ -187,7 +187,7 @@ export function referralDownloadLink(): string {
 
 export function buildShareMessage(): string {
   const c = getMyRefCode();
-  return `Devis Designer — créez vos devis et factures professionnels en un clin d'oeil.\n20 exports gratuits. Abonnement 2000 F/mois ou 15000 F/an.\nTélécharger : ${referralDownloadLink()}\nCode parrain : ${c}\n(Parrainage : 1 ami qui installe avec ce code et exporte un devis = 1 mois offert pour moi.)`;
+  return `Devis Designer — des devis et factures pros en 2 minutes, directement dans le navigateur (aucune installation, ça marche aussi sur téléphone).\n20 exports PDF offerts, puis 2 000 F/mois ou 15 000 F/an.\n\nOuvrir : ${referralDownloadLink()}\nMon code parrain : ${c}\n(Passez par mon lien : le code est repris tout seul. Dès que vous exportez un document, je gagne 1 mois offert.)`;
 }
 
 /** URL WhatsApp pré-remplie pour recommander l'app. */

@@ -2,7 +2,8 @@
    Système de monétisation — licences, quota d'EXPORTS et codes
    ------------------------------------------------------------
    Offres (v2) :
-   - 20 EXPORTS PDF / envois signature GRATUITS par installation
+   - 20 EXPORTS PDF / envois signature GRATUITS par appareil (fenêtre glissante
+     de 30 jours, comptée par le Worker quand il est joignable — voir src/lib/quota.ts)
    - Abonnement mensuel     : 2 000 F / mois
    - Abonnement 1 an        : 15 000 F / an
    - Design personnalisé    : 5 000 F (paiement unique)

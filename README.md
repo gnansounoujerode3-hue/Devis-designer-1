@@ -15,13 +15,16 @@ npm run preview    # prévisualiser le build
 
 ## Fonctionnalités
 
+- **Application web, sans installation** : un seul fichier `dist/index.html`, servi par Netlify
+  (`https://devisdesigner.netlify.app/`) ; ajoutable à l'écran d'accueil du téléphone
 - **12 templates de devis/factures** personnalisables (couleurs, polices, logo, conditions)
 - **Édition directe** : toucher/cliquer un texte sur l'aperçu pour le modifier (n'importe quel texte)
 - **Signatures** manuscrites (émetteur + client), envoi pour signature
 - **Export** : PDF (A4 multipages), SVG, présentation plein écran
 - **Sauvegarde / restauration** JSON (export/import de tous les devis + clients)
-- **Monétisation intégrée** : 20 exports gratuits, abonnements 2000 F/mois, 15 000 F/an,
-  design personnalisé 5 000 F, tous les designs 50 000 F/an (activation par codes)
+- **Monétisation intégrée** : 20 exports gratuits par appareil sur 30 jours glissants (comptés par
+  le Worker — voir plus bas), abonnements 2000 F/mois, 15 000 F/an, design personnalisé 5 000 F,
+  tous les designs 50 000 F/an (activation automatique après paiement, code en secours)
 - **Parrainage (seule récompense gratuite)** : 1 parrainage valide = **1 mois offert au parrain**
   (le filleul ne reçoit rien) — plafond 12 mois/an. Aucun concours, aucun autre bonus de mois gratuits
 - **FAQ, CGU et politique de confidentialité** intégrés (conforme loi n°2017-20 Bénin)
@@ -36,13 +39,14 @@ devis-designer/
 ├── vite.config.ts      # Configuration Vite (fichier unique)
 ├── tsconfig.json       # TypeScript strict
 ├── backend/
-│   └── worker.js       # Serveur de validation des codes (Cloudflare Worker, optionnel)
+│   └── worker.js       # Serveur : codes d'activation, quota d'exports, parrainage (Cloudflare Worker)
 └── src/
     ├── main.tsx        # Bootstrap React
     ├── App.tsx         # Composant racine
     ├── components/     # Paywall, Espace vendeur (VendorPage), FAQ, Legal, Onboarding...
     ├── templates/      # Les 12 templates SVG
-    ├── lib/            # license (quota/codes), referral (parrainage), config, store...
+    ├── lib/            # license (codes/hors-ligne), quota (compteur serveur), referral
+    │                   # (parrainage), adminKey (clé ADMIN_PASS), config, store...
     ├── store.ts        # Persistance localStorage + sauvegarde JSON
     ├── types.ts        # Types partagés
     └── assets/         # Logo
@@ -157,7 +161,7 @@ Page **réservée au vendeur** (vous), **invisible des utilisateurs** : aucune
 liaison dans l'application, accès uniquement via l'URL :
 
 ```
-https://votre-app.com/#/vendeur
+https://devisdesigner.netlify.app/#/vendeur
 ```
 
 1. Saisissez le **PIN** (`VENDOR_PIN` dans `src/lib/config.ts` — par défaut `2468`, **à changer**).
@@ -319,6 +323,20 @@ un autre chantier.
 
 Entre les deux, les leviers à faible effort restent : abaisser `QUOTA_LIMIT`, ou ajouter
 un filigrane « Version d'essai » sur les PDF gratuits.
+
+## 🔗 Lien public & lien de parrainage
+
+Tout part d'une seule constante, `VENDOR.DOWNLOAD_LINK` dans `src/lib/config.ts`
+(actuellement `https://devisdesigner.netlify.app/`) :
+
+- les boutons « Parrainer un ami sur WhatsApp » partagent **`…/?ref=DDREF-VOTRECODE`** ;
+- à l'arrivée, `App.tsx` lit `?ref=`, enregistre le code parrain du filleul et enlève
+  le paramètre de l'URL propre (pas besoin pour lui de taper quoi que ce soit) ;
+- la FAQ, les partages et l'aperçu WhatsApp (`index.html` → balises `og:`) utilisent la
+  même adresse.
+
+**Si vous changez de domaine, changez-la ici** puis recontruisez/publiez — sinon les liens
+de parrainage pointent vers l'ancien site et les nouveaux filleuls ne comptent pas.
 
 ## Notes
 

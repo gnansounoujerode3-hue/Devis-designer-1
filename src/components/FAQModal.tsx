@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { VENDOR } from '../lib/config';
+import { VENDOR, APP_VERSION } from '../lib/config';
+
+/** Adresse publique de l'app (la même que celle des liens de parrainage). */
+const APP_URL = VENDOR.DOWNLOAD_LINK.replace(/\/+$/, '');
 
 interface Props {
   open: boolean;
@@ -9,66 +12,73 @@ interface Props {
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Comment installer l\'application ?',
-    a: 'Sur PC : téléchargez le fichier .exe et double-cliquez dessus (aucune installation nécessaire). Sur téléphone : envoyez le fichier .apk sur votre appareil (WhatsApp, câble USB), ouvrez-le et autorisez l\'installation depuis « sources inconnues » lorsque le système le demande.',
+    a: `Aucune installation : ${VENDOR.APP_NAME} est une application web. Ouvrez ${APP_URL} dans votre navigateur (PC, tablette ou téléphone) et travaillez tout de suite. Sur téléphone, le menu du navigateur propose « Installer l'application » ou « Ajouter à l'écran d'accueil » : vous obtenez une icône qui ouvre l'app comme une application normale.`,
   },
   {
     q: 'L\'application fonctionne-t-elle sans internet ?',
-    a: `Oui, ${VENDOR.APP_NAME} fonctionne 100 % hors-ligne. Vous pouvez créer, modifier et exporter vos devis sans connexion. Internet n\'est nécessaire que pour les paiements (Chariow) et les liens de partage WhatsApp.`,
+    a: `Oui pour l'essentiel : créer, modifier, consulter et sauvegarder vos devis se fait hors-ligne, et vos documents restent sur votre appareil. Internet sert au paiement, aux liens de partage WhatsApp et à la vérification du compteur d'exports — si le serveur est injoignable, l'application utilise son compteur local et rien ne se bloque.`,
   },
   {
     q: 'Quels sont les prix ?',
-    a: 'La version gratuite offre 20 exports PDF / envois pour signature. Ensuite : abonnement mensuel 2 000 F, abonnement 1 an 15 000 F, design personnalisé 5 000 F (paiement unique), ou tous les designs pendant 1 an 50 000 F.',
-  },
-  {
-    q: 'Comment payer ?',
-    a: 'Les paiements se font via Chariow (Mobile Money : MTN MoMo, Orange Money, Wave, Moov) ou selon les modalités indiquées dans la fenêtre d\'offres. Après paiement, vous recevez un code d\'activation.',
-  },
-  {
-    q: 'Comment activer mon abonnement ?',
-    a: 'Ouvrez la fenêtre des offres (bouton « PRO » ou « X EXPORTS GRATUITS » en haut), section « Déjà abonné ? », saisissez le code d\'activation reçu et cliquez sur « Activer ». Votre licence est active immédiatement.',
-  },
-  {
-    q: 'Que se passe-t-il à la fin de mon abonnement ?',
-    a: 'Vos devis restent consultables et modifiables. Seuls les nouveaux exports PDF et envois pour signature sont bloqués jusqu\'au renouvellement. Un rappel s\'affiche 3 jours avant l\'expiration.',
+    a: `La version gratuite donne 20 exports (PDF ou envoi pour signature) par appareil, sur une période glissante de 30 jours. Ensuite : abonnement mensuel 2 000 F, abonnement 1 an 15 000 F, design personnalisé 5 000 F (paiement unique), ou tous les designs pendant 1 an 50 000 F. La création de devis, elle, reste gratuite et illimitée.`,
   },
   {
     q: 'Combien d\'exports gratuits ai-je droit ?',
-    a: '20 exports (PDF ou envoi pour signature) par installation. La création de devis, elle, est illimitée et gratuite.',
+    a: `20 exports par appareil sur 30 jours glissants. Le compteur est tenu par le serveur de l'application à partir d'une empreinte de l'appareil : changer de navigateur, ouvrir une fenêtre privée, effacer les données du site ou réimporter une sauvegarde ne le remet donc pas à zéro. Un compteur local sert de secours quand vous êtes hors-ligne.`,
+  },
+  {
+    q: 'Une fenêtre de navigation privée donne-t-elle des exports gratuits en plus ?',
+    a: `Non. C'est précisément le cas d'usage que le compteur serveur bloque : l'empreinte de l'appareil et le code de l'installation sont reconnus même en navigation privée, et le nombre d'exports déjà consommés reste acquis sur la période de 30 jours. Si vous avez un vrai besoin d'exports supplémentaires, il y a trois voies honnêtes : l'abonnement, le parrainage, ou une demande de déblocage au vendeur.`,
+  },
+  {
+    q: 'J\'ai atteint ma limite d\'exports, que faire ?',
+    a: `Trois options : attendre la fin de la période en cours (la fenêtre d'offres indique « remise à zéro dans X jours »), parrainer un ami (1 mois offert par parrainage valide, jusqu'à 12 mois), ou prendre un abonnement. Si vous venez d'installer l'app sur un nouvel appareil, utilisez le bouton « Demander un déblocage » dans la fenêtre d'offres : le vendeur valide en un clic et vous pouvez exporter à nouveau.`,
+  },
+  {
+    q: 'Comment payer ?',
+    a: `Bouton « PRO » (ou « X EXPORTS GRATUITS » en haut), choisissez l'offre et payez par Mobile Money (MTN MoMo, Orange Money, Wave, Moov) dans la caisse sécurisée. Dès que le paiement est confirmé, l'abonnement s'active automatiquement : aucun code à taper. Si la caisse est injoignable, payez au ${VENDOR.PHONE} et le vendeur vous transmet un code d'activation.`,
+  },
+  {
+    q: 'Comment activer mon abonnement ?',
+    a: `Normalement vous n'avez rien à faire : l'activation est automatique après paiement. Si le vendeur vous a transmis un code, ouvrez la fenêtre des offres, section « Déjà abonné ? », collez-le et cliquez sur « Activer ». La licence est active immédiatement.`,
+  },
+  {
+    q: 'Que se passe-t-il à la fin de mon abonnement ?',
+    a: `Vos devis restent consultables et modifiables. Seuls les nouveaux exports PDF et envois pour signature sont bloqués jusqu'au renouvellement. Un rappel s'affiche 3 jours avant l'expiration.`,
   },
   {
     q: 'Comment sauvegarder mes devis ?',
-    a: 'Sur la page d\'accueil, utilisez la barre « SAUVEGARDE » : « Exporter une copie » télécharge un fichier contenant tous vos devis et clients. « Restaurer une copie » permet de les réimporter, sur le même appareil ou un autre.',
+    a: `Sur la page d'accueil, dans la barre « SAUVEGARDE » : « Exporter une copie » télécharge un fichier JSON contenant tous vos devis et vos clients — ainsi que votre compteur d'exports. « Restaurer une copie » les réimporte, sur le même appareil ou sur un autre.`,
   },
   {
     q: 'Puis-je utiliser l\'application sur plusieurs appareils ?',
-    a: 'Oui. Exportez une copie de sauvegarde sur le premier appareil, puis restaurez-la sur le second. Vos devis et clients seront fusionnés (sans doublons).',
-  },
-  {
-    q: 'Comment commander un design personnalisé (5 000 F) ?',
-    a: 'Payez l\'offre « Design Personnalisé » (5 000 F), activez le code reçu, puis un encart vert apparaît avec un bouton WhatsApp : décrivez-y votre design (couleurs, logo, mise en page) et le designer vous le crée.',
+    a: `Oui. Exportez une copie sur le premier appareil et restaurez-la sur le second : devis et clients sont fusionnés sans doublons. Deux précisions : chaque appareil conserve son propre compteur d'exports (le quota ne se transfère pas en bonus), et la licence est liée à l'appareil qui l'a activée — pour la déplacer, prévenez le vendeur au ${VENDOR.PHONE}.`,
   },
   {
     q: 'Comment fonctionne le parrainage ?',
-    a: 'C\'est la seule façon d\'obtenir des mois gratuits. Partagez votre code parrain (bouton « PRO » → encart PARRAINAGE). Chaque ami qui installe l\'application avec ce code et exporte au moins un document vous offre 1 mois gratuit : son application génère un code de remerciement qu\'il vous envoie sur WhatsApp, et vous le collez dans « Déjà abonné ? ». Plafond : 12 mois offerts par an. Le filleul, lui, ne reçoit rien.',
+    a: `C'est la seule façon d'obtenir des mois gratuits. Partagez votre lien de parrainage (bouton « Parrainer un ami sur WhatsApp » de l'encart PARRAINAGE, accessible via « PRO ») : le lien porte déjà votre code, votre ami n'a rien à saisir. Dès qu'il a exporté au moins un document, votre application reçoit 1 mois offert sous forme de code de remerciement qu'il vous envoie ; vous le collez dans « Déjà abonné ? ». Plafond : 12 mois offerts sur 12 mois glissants, et un seul mois par filleul. Le filleul, lui, ne reçoit rien.`,
   },
   {
     q: 'J\'ai un code parrain, où le saisir ?',
-    a: 'Ouvrez la fenêtre des offres (bouton « PRO »), encart « PARRAINAGE », champ « Un ami vous a parrainé ? » : saisissez le code DDREF-… puis « Enregistrer ». Dès votre premier export, votre parrain recevra automatiquement son mois offert de votre part.',
+    a: `Le plus simple : ouvrez le lien reçu, le code est enregistré tout seul. Sinon, ouvrez la fenêtre des offres (bouton « PRO »), encart « PARRAINAGE », champ « Un ami vous a parrainé ? », saisissez le code DDREF-… puis « Enregistrer ». Dès votre premier export, votre parrain reçoit son mois offert.`,
   },
   {
     q: 'Mes données sont-elles en sécurité ?',
-    a: 'Oui. Toutes vos données restent sur votre appareil : elles ne sont jamais envoyées sur internet ni partagées. Protégez simplement votre appareil avec un code PIN.',
+    a: `Vos devis, vos clients, vos logos et vos signatures ne quittent jamais votre appareil : ils ne sont ni envoyés, ni lus, ni stockés par un serveur. Seules des informations purement techniques circulent quand vous êtes en ligne — une empreinte de l'appareil, le code de l'installation et le nombre d'exports — uniquement pour compter le quota gratuit et valider le parrainage. Rien n'est revendu ni utilisé à des fins publicitaires. Protégez tout de même votre appareil par un code PIN : c'est lui qui contient vos données.`,
   },
   {
     q: 'J\'ai perdu un code d\'activation, que faire ?',
-    a: 'Contactez le support avec vos informations de paiement : le code pourra vous être renvoyé. Ne partagez jamais vos codes avec d\'autres personnes.',
+    a: `Contactez le support avec vos informations de paiement (date, montant, numéro) : le code pourra vous être renvoyé, ou votre licence réactivée sur votre nouvel appareil. Ne partagez jamais vos codes avec d'autres personnes.`,
+  },
+  {
+    q: 'Comment vérifier que j\'ai la bonne version ?',
+    a: `Le pied de page affiche « Devis Designer · Version ${APP_VERSION} ». Si un écran semble bloqué ou date un peu, rechargez en dur (Ctrl+Maj+R sur ordinateur, ou videz le cache du navigateur sur téléphone) : l'application tient dans un seul fichier et l'ancienne version peut rester en cache.`,
   },
   {
     q: 'Comment contacter le support ?',
-    a: `Par WhatsApp ou par téléphone au ${VENDOR.PHONE}, ou par email à ${VENDOR.EMAIL}. Nous répondons en général sous 24 h.`,
+    a: `Par WhatsApp ou téléphone au ${VENDOR.PHONE}, ou par email à ${VENDOR.EMAIL}. Nous répondons en général sous 24 h.`,
   },
 ];
-
 export default function FAQModal({ open, onClose }: Props) {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
   if (!open) return null;
