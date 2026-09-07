@@ -5,3 +5,7 @@ dist
 .env
 .env.*
 !.env.example
+# Fichiers de design livrés aux clients (générés par `npm run design:pack`) :
+# ce sont des artefacts, la source reste le .tsx
+*.dddesign.js
+node_modules/.dd

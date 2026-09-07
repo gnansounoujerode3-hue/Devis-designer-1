@@ -201,7 +201,7 @@ export default function LandingPage() {
     { name: 'Découverte', amount: '0 F', note: `${FREE_EXPORT_LIMIT} exports offerts`, desc: `${FREE_EXPORT_LIMIT} exports par appareil sur 30 jours, tous les modèles inclus. Sans carte bancaire, sans engagement.` },
     { name: 'Abonnement 1 mois', amount: price(PRICE_MONTHLY), desc: 'Exports et envois en signature illimités pendant 1 mois. Code d’activation envoyé après paiement.' },
     { name: 'Abonnement 1 an', amount: price(PRICE_ANNUAL), note: 'soit 1 250 F/mois', desc: `12 mois d’exports illimités. ${price(PRICE_ANNUAL)} au lieu de ${price(PRICE_MONTHLY * 12)} : 9 000 F d’économie.`, best: true },
-    { name: 'Design personnalisé', amount: price(PRICE_CUSTOM_DESIGN), desc: 'Le vendeur crée une mise en page à vos couleurs, uniquement pour vous (paiement unique).' },
+    { name: 'Design personnalisé', amount: price(PRICE_CUSTOM_DESIGN), desc: `Le vendeur crée une mise en page à vos couleurs, pour vous seul — et 1 mois d'exports illimités est inclus. Vous recevez le design en fichier, à importer dans l'application.` },
     { name: 'Tous les designs · 1 an', amount: price(PRICE_ALL), desc: 'N’importe quel modèle gratuit pendant 1 an, exports illimités inclus.' },
   ];
 

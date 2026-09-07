@@ -808,7 +808,13 @@ async function verifyCode(code, env) {
         }
         else if (kind === 'ANNUAL') { type = 'annual'; expiresAt = now + YEAR; }
         else if (kind === 'ALL') { type = 'all'; expiresAt = now + YEAR; customDesign = true; }
-        else if (kind === 'DESIGN') { type = null; customDesign = true; }
+        else if (kind === 'DESIGN') {
+          /* Design sur mesure = 1 mois d'exports offerts avec : sinon le client
+             bloque a 20 exports paie un design sans pouvoir exporter. */
+          type = 'monthly';
+          expiresAt = now + MONTH;
+          customDesign = true;
+        }
         else return { ok: false, message: 'Type de code inconnu.' };
         return { ok: true, license: { type, expiresAt, customDesign } };
       } catch { return { ok: false, message: 'Code illisible.' }; }

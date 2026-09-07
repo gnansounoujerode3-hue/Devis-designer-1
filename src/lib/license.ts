@@ -415,9 +415,21 @@ export async function applyCode(input: string): Promise<{ ok: true; message: str
       saveLicense({ type: 'all', expiresAt, customDesign: true });
       return { ok: true, message: `Offre TOUS LES DESIGNS (1 an) activée. Expire le ${new Date(expiresAt).toLocaleDateString('fr-FR')}.` };
     }
-    case 'DESIGN':
-      saveLicense({ type: cur.type, expiresAt: cur.expiresAt, customDesign: true });
-      return { ok: true, message: 'Design personnalisé débloqué. Contactez le designer pour décrire votre design.' };
+    case 'DESIGN': {
+      /* Le design sur mesure s'accompagne d'UN MOIS d'exports illimités. Sans ça,
+         un client bloqué à 20 exports qui achète uniquement le design paierait…
+         et ne pourrait toujours pas exporter son document. */
+      const licensed = cur.type === 'monthly' || cur.type === 'annual' || cur.type === 'all';
+      const base = licensed && cur.expiresAt > now ? cur.expiresAt : now;
+      const expiresAt = base + MONTH_MS;
+      saveLicense({ type: licensed ? cur.type : 'monthly', expiresAt, customDesign: true });
+      return {
+        ok: true,
+        message: licensed
+          ? `Design personnalisé débloqué, et 1 mois d'exports ajouté (jusqu'au ${new Date(expiresAt).toLocaleDateString('fr-FR')}). Contactez le designer pour décrire votre design.`
+          : `Design personnalisé débloqué + 1 mois d'exports illimités (jusqu'au ${new Date(expiresAt).toLocaleDateString('fr-FR')}). Contactez le designer pour décrire votre design.`,
+      };
+    }
     default:
       return { ok: false, message: 'Type de code inconnu.' };
   }
@@ -518,7 +530,7 @@ export function codeKindLabel(kind: CodeKind, months?: number): string {
     case 'MONTHLY': return months ? `${months} mois` : '1 mois';
     case 'ANNUAL': return '1 an (15 000 F)';
     case 'ALL': return 'Tous designs 1 an (50 000 F)';
-    case 'DESIGN': return 'Design (5 000 F)';
+    case 'DESIGN': return 'Design + 1 mois (5 000 F)';
     case 'REFERRAL': return months && months > 1 ? `Parrainage — ${months} mois offerts` : 'Parrainage — 1 mois offert';
     default: return kind;
   }

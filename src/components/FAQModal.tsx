@@ -19,8 +19,12 @@ const FAQS: { q: string; a: string }[] = [
     a: `Non. ${VENDOR.APP_NAME} est un site web : il faut une connexion pour l'ouvrir, comme pour n'importe quelle page. Ensuite, tout ce que vous saisissez est enregistré sur votre appareil au fil de l'eau — si le réseau lâche en plein travail, rien n'est perdu : rechargez la page une fois revenu en ligne et vos devis sont là. Internet sert aussi au paiement, aux liens de partage WhatsApp et à la vérification du compteur d'exports et du parrainage. En zone sans couverture, vous ne pourrez donc pas ouvrir l'application : faites vos sauvegardes pendant que vous captez (« Exporter une copie ») pour pouvoir tout réimporter dès que le réseau revient. Un mode « installable » qui fonctionnerait sans réseau (avec cache local de l'application) n'existe pas dans cette version : ce que vous avez saisi est bien gardé sur votre appareil, mais la page elle-même se charge en ligne.`,
   },
   {
+    q: 'Comment se passe le design personnalisé à 5 000 F ?',
+    a: `Vous payez, l'offre s'active avec votre code (et un mois d'exports illimités est ajouté par la même occasion). Ensuite, décrivez au vendeur ce que vous voulez (couleurs, logo, disposition) sur WhatsApp. Il prépare le modèle chez lui et vous envoie un fichier .dddesign.js. Vous ouvrez l'application, bouton « PRO » puis carte « Importer mon design », vous choisissez le fichier : il est vérifié (un fichier modifié est refusé), puis rangé sur votre appareil. Votre design apparaît alors dans l'onglet STYLE, comme un modèle — à vous seul, les autres utilisateurs ne le voient pas. Si vous changez de poste, la copie JSON que vous exportez l'emporte avec lui.`,
+  },
+  {
     q: 'Quels sont les prix ?',
-    a: `La version gratuite donne 20 exports (PDF ou envoi pour signature) par appareil, sur une période glissante de 30 jours. Ensuite : abonnement mensuel 2 000 F, abonnement 1 an 15 000 F, design personnalisé 5 000 F (paiement unique), ou tous les designs pendant 1 an 50 000 F. La création de devis, elle, reste gratuite et illimitée.`,
+    a: `La version gratuite donne 20 exports (PDF ou envoi pour signature) par appareil, sur une période glissante de 30 jours. Ensuite : abonnement mensuel 2 000 F, abonnement 1 an 15 000 F, design personnalisé 5 000 F (paiement unique, qui inclut 1 mois d'exports illimités), ou tous les designs pendant 1 an 50 000 F. La création de devis, elle, reste gratuite et illimitée.`,
   },
   {
     q: 'Combien d\'exports gratuits ai-je droit ?',

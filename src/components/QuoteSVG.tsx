@@ -1,6 +1,6 @@
 import React from 'react';
 import { QuoteData } from '../types';
-import { TEMPLATE_COMPONENTS } from '../templates';
+import { resolveTemplate } from '../templates';
 
 interface Props {
   data: QuoteData;
@@ -8,6 +8,6 @@ interface Props {
 }
 
 export default function QuoteSVG({ data, svgRef }: Props) {
-  const Template = TEMPLATE_COMPONENTS[data.templateId] || TEMPLATE_COMPONENTS.modern;
+  const Template = resolveTemplate(data.templateId);
   return <Template data={data} svgRef={svgRef} />;
 }

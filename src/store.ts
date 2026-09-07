@@ -1,5 +1,6 @@
 import { DocType, QuoteData, QuoteItem, SavedClient } from './types';
 import { getExportCount, setExportCountAtLeast } from './lib/license';
+import { adoptDesignBlob, designBlobForBackup } from './lib/customDesign';
 
 const DOCS_KEY = 'devis_designer_docs';
 const CLIENTS_KEY = 'devis_designer_clients';
@@ -228,6 +229,12 @@ export interface BackupData {
   clients: SavedClient[];
   /** Nombre d'exports déjà consommés sur l'appareil qui a exporté la sauvegarde. */
   exportCount?: number;
+  /**
+   * Design personnalisé du client (fichier signé, texte brut) : sans lui, un
+   * changement de poste ferait perdre le modèle payé 5 000 F. Il est revérifié
+   * à la restauration, donc un fichier édité à la main est rejeté.
+   */
+  customDesign?: string;
 }
 
 /** Exporte toutes les données (devis + clients) en fichier JSON téléchargeable. */
@@ -239,6 +246,7 @@ export function exportAllData(): BackupData {
     docs: loadAllDocs(),
     clients: loadClients(),
     exportCount: getExportCount(),
+    customDesign: designBlobForBackup(),
   };
 }
 
@@ -287,10 +295,22 @@ export function importAllData(json: string, mode: 'merge' | 'replace' = 'merge')
     // "neuf" en réimportant une sauvegarde sur un appareil vierge (max retenu).
     const restoredCount = typeof data.exportCount === 'number' ? setExportCountAtLeast(data.exportCount) : getExportCount();
 
+    /* Le design personnalisé est revérifié (signature) puis réinstallé. C'est
+       asynchrone : on n'attend pas le résultat pour valider l'import des documents
+       (un blob falsifié ne s'installe simplement pas). En mode « remplacer », un
+       design déjà présent sur l'appareil est conservé si la sauvegarde n'en
+       contient pas : on n'efface pas un modèle payé à l'occasion d'un import. */
+    function restoreDesign(blob: unknown): string {
+      if (typeof blob !== 'string' || !blob.trim()) return '';
+      void adoptDesignBlob(blob).then(ok => { if (!ok) console.warn('Design personnalisé non restauré : signature invalide.'); });
+      return ' Votre design personnalisé est restauré aussi.';
+    }
+    const designNote = restoreDesign(data.customDesign);
+
     if (mode === 'replace') {
       saveAllDocs(incomingDocs);
       localStorage.setItem(CLIENTS_KEY, JSON.stringify(incomingClients));
-      return { ok: true, message: `${incomingDocs.length} document(s) et ${incomingClients.length} client(s) restaurés.${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}` };
+      return { ok: true, message: `${incomingDocs.length} document(s) et ${incomingClients.length} client(s) restaurés.${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}${designNote}` };
     }
 
     // Merge : on garde les existants, on ajoute les nouveaux
@@ -306,7 +326,7 @@ export function importAllData(json: string, mode: 'merge' | 'replace' = 'merge')
 
     saveAllDocs(mergedDocs);
     localStorage.setItem(CLIENTS_KEY, JSON.stringify(mergedClients));
-    return { ok: true, message: `${incomingDocs.length} document(s) importé(s) (${mergedDocs.length} au total).${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}` };
+    return { ok: true, message: `${incomingDocs.length} document(s) importé(s) (${mergedDocs.length} au total).${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}${designNote}` };
   } catch {
     return { ok: false, message: 'Impossible de lire ce fichier.' };
   }

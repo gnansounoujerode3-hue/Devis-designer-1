@@ -5,7 +5,7 @@ import QuoteSVG from './components/QuoteSVG';
 import FontPicker from './components/FontPicker';
 import SignatureModal from './components/SignatureModal';
 import { QuoteData, QuoteItem, CurrencyCode, CURRENCIES, formatMoney, DocStatus, STATUS_META, SavedClient, WATERMARK_LABEL } from './types';
-import { TEMPLATES } from './templates';
+import { allTemplates, onDesignChange } from './templates';
 import { createDefaultDoc, newItemRow, loadAllDocs, saveDoc, deleteDoc, duplicateDoc, convertToInvoice, loadClients, saveClient, deleteClient, getNextNumber } from './store';
 import { buildSignatureHtml } from './lib/generateSignHtml';
 import PaywallModal from './components/PaywallModal';
@@ -119,6 +119,9 @@ export default function App() {
   const [paywall, setPaywall] = useState(false);
   const [paywallBlocked, setPaywallBlocked] = useState(false);
   const [licenseTick, setLicenseTick] = useState(0);
+  /* Un design personnalisé importé (ou retiré) change la liste des modèles :
+     on réaffiche via le même tick que l'activation d'un code. */
+  useEffect(() => onDesignChange(() => setLicenseTick(t => t + 1)), []);
   /** Rafraîchit l'encart parrainage après un export (code remerciement du parrain). */
   const [referralTick, setReferralTick] = useState(0);
   /** État du compteur d'exports (serveur si disponible, sinon local). */
@@ -898,7 +901,7 @@ export default function App() {
             {/* TAB 4 */}
             {tab === 4 && (<>
               <Label text="Modele" accent={data.accentColor} dark={dark} />
-              <div className="grid grid-cols-1 gap-3">{TEMPLATES.map(t => (<button key={t.id} onClick={() => set('templateId', t.id)} className={`relative text-left p-4 rounded-xl border-2 transition-all ${data.templateId === t.id ? 'shadow-sm' : dark ? 'border-zinc-700 hover:border-zinc-600 bg-zinc-800/30' : 'border-[#ECECEC] hover:border-[#DDD] bg-[#FAFAFA]'}`} style={data.templateId === t.id ? { borderColor: data.accentColor, background: dark ? '#1e1e3a' : '#F8F8FF' } : {}}><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ background: data.templateId === t.id ? data.accentColor : '#555' }}>{t.name.charAt(0)}</div><div className="flex-1 min-w-0"><div className={`text-sm font-bold ${data.templateId === t.id ? '' : dark ? 'text-zinc-300' : 'text-[#555]'}`} style={data.templateId === t.id ? { color: data.accentColor } : {}}>{t.name}</div><div className="text-[10px] text-[#999] truncate">{t.description}</div></div>{data.templateId === t.id && <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: data.accentColor }}><svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg></div>}</div></button>))}</div>
+              <div className="grid grid-cols-1 gap-3">{allTemplates().map(t => (<button key={t.id} onClick={() => set('templateId', t.id)} className={`relative text-left p-4 rounded-xl border-2 transition-all ${data.templateId === t.id ? 'shadow-sm' : dark ? 'border-zinc-700 hover:border-zinc-600 bg-zinc-800/30' : 'border-[#ECECEC] hover:border-[#DDD] bg-[#FAFAFA]'}`} style={data.templateId === t.id ? { borderColor: data.accentColor, background: dark ? '#1e1e3a' : '#F8F8FF' } : {}}><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ background: data.templateId === t.id ? data.accentColor : '#555' }}>{t.name.charAt(0)}</div><div className="flex-1 min-w-0"><div className={`text-sm font-bold ${data.templateId === t.id ? '' : dark ? 'text-zinc-300' : 'text-[#555]'}`} style={data.templateId === t.id ? { color: data.accentColor } : {}}>{t.name}</div><div className="text-[10px] text-[#999] truncate">{t.description}</div></div>{data.templateId === t.id && <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: data.accentColor }}><svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg></div>}</div></button>))}</div>
               <div className={`h-px my-2 ${dark ? 'bg-zinc-700' : 'bg-[#E8E8E8]'}`} />
               <Label text="Typographie" accent={data.accentColor} dark={dark} />
               <FontPicker value={data.fontFamily} onChange={v => set('fontFamily', v)} accent={data.accentColor} />
@@ -1080,7 +1083,7 @@ export default function App() {
                   <div>
                     <label className={`text-[11px] font-bold tracking-wider uppercase mb-2 block ${dark ? 'text-zinc-400' : 'text-[#999]'}`}>MODÈLE</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {TEMPLATES.map(t => (
+                      {allTemplates().map(t => (
                         <button key={t.id} onClick={() => set('templateId', t.id)} className={`text-left px-3 py-2 rounded-xl border-2 text-[10px] font-bold transition-all ${data.templateId === t.id ? '' : dark ? 'border-zinc-700 hover:border-zinc-600 bg-zinc-800/30' : 'border-[#ECECEC] hover:border-[#DDD] bg-[#FAFAFA]'}`} style={data.templateId === t.id ? { borderColor: data.accentColor, background: dark ? '#1e1e3a' : '#F8F8FF', color: data.accentColor } : {}}>
                           {t.name}
                         </button>

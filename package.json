@@ -1,7 +1,7 @@
 {
   "name": "devis-designer",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "Devis Designer — Générateur de devis et factures professionnels (application web)",
   "author": "Votre Nom",
   "type": "module",
@@ -9,7 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && npx vercel --prod"
+    "deploy": "vite build && npx vercel --prod",
+    "design:pack": "esbuild scripts/design-pack.ts --bundle --platform=node --format=cjs --external:esbuild --outfile=node_modules/.dd/design-pack.cjs --log-level=warning && node node_modules/.dd/design-pack.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",
@@ -26,6 +27,7 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.1",
+    "esbuild": "^0.27.7",
     "playwright-core": "^1.62.1",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",

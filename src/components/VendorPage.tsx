@@ -386,6 +386,27 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
             ))}
           </div>
 
+          {offer.kind === 'DESIGN' && (
+            <div className="mb-3 rounded-xl border border-dashed p-3" style={{ borderColor: '#10B98166' }}>
+              <div className="text-[10px] font-black tracking-widest mb-1" style={{ color: '#059669' }}>ET APRÈS LE PAIEMENT, POUR LIVRER ?</div>
+              <p className="text-[11.5px] leading-relaxed text-[#555] dark:text-zinc-300">
+                Le code active chez le client la carte « Importer mon design » (+ 1 mois d'exports illimités), mais
+                ne livre aucun modèle : c'est vous qui le fabriquez. Copiez le gabarit
+                {' '}<code className="px-1 rounded bg-[#F2F2F2] dark:bg-zinc-800 text-[10.5px]">scripts/design-example.tsx</code>{' '}
+                en{' '}<code className="px-1 rounded bg-[#F2F2F2] dark:bg-zinc-800 text-[10.5px]">src/templates/DesignClient.tsx</code>,
+                adaptez-le, puis emballez :
+              </p>
+              <div className="mt-2 px-3 py-2 rounded-lg bg-[#0B1220] text-[10.5px] font-mono text-green-300 overflow-x-auto whitespace-nowrap">
+                npm run design:pack src/templates/DesignClient.tsx --name "Design Dupont"
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-[#777] dark:text-zinc-400">
+                Envoyez ensuite le fichier <b>DesignClient.dddesign.js</b> obtenu (WhatsApp, 7 ko environ) :
+                le client l'importe, et le modèle n'apparaît que chez lui. Gardez le <b>.tsx</b> — c'est votre
+                archive, et une correction passe par un nouveau fichier.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
             <input
               value={client}

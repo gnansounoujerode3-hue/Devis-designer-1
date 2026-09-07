@@ -9,6 +9,7 @@ import { getMyRefCode } from '../lib/referral';
 import { quotaRefresh, type QuotaState } from '../lib/quota';
 import ReferralCard from './ReferralCard';
 import QuotaUnlockCard from './QuotaUnlockCard';
+import CustomDesignCard from './CustomDesignCard';
 
 interface Props {
   open: boolean;
@@ -26,7 +27,7 @@ type OfferId = 'monthly' | 'annual' | 'design' | 'all';
 const OFFERS: { id: OfferId; title: string; price: number; desc: string; badge?: string; link: string }[] = [
   { id: 'monthly', title: 'Abonnement Mensuel', price: PRICE_MONTHLY, desc: 'Exports PDF et envois signature illimités pendant 1 mois.', badge: 'Populaire', link: CHARIOW_LINKS.MONTHLY },
   { id: 'annual', title: 'Abonnement 1 An', price: PRICE_ANNUAL, desc: 'Exports illimités pendant 1 an. Économisez 2 mois par rapport au mensuel.', link: CHARIOW_LINKS.ANNUAL },
-  { id: 'design', title: 'Design Personnalisé', price: PRICE_CUSTOM_DESIGN, desc: 'Un design sur mesure pour VOTRE template, créé pour vous.', link: CHARIOW_LINKS.CUSTOM_DESIGN },
+  { id: 'design', title: 'Design Personnalisé', price: PRICE_CUSTOM_DESIGN, desc: 'Un design sur mesure pour VOTRE document, créé pour vous + 1 mois d’exports illimités.', link: CHARIOW_LINKS.CUSTOM_DESIGN },
   { id: 'all', title: 'TOUS les Designs (1 an)', price: PRICE_ALL, desc: 'N\'importe quel design de template gratuit pendant 1 an + exports illimités.', badge: 'Best value', link: CHARIOW_LINKS.ALL },
 ];
 
@@ -322,7 +323,8 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
 
           </div>
 
-          {/* Design personnalisé acheté : contact */}
+          {/* Design personnalisé : on importe le fichier reçu du vendeur (puis on le contacte) */}
+          {license.customDesign && <CustomDesignCard onChanged={() => { refresh(); onActivated?.(); }} />}
           {license.customDesign && !contactDesign && (
             <button onClick={() => setContactDesign(true)} className="w-full rounded-xl border-2 border-dashed border-[#0057FF]/40 p-3 text-xs font-bold text-[#0057FF] hover:bg-blue-50 dark:hover:bg-blue-950/30">
               Design personnalisé débloqué — contacter le designer

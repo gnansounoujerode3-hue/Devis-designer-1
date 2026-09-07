@@ -25,6 +25,7 @@ npm run preview    # prévisualiser le build
 - **Signatures** manuscrites (émetteur + client), envoi pour signature
 - **Export** : PDF (A4 multipages), SVG, présentation plein écran
 - **Sauvegarde / restauration** JSON (export/import de tous les devis + clients)
+  Voir plus bas « Design personnalisé : fabriquer et livrer le fichier » pour la livraison du fichier.
 - **Monétisation intégrée** : 20 exports gratuits par appareil sur 30 jours glissants (comptés par
   le Worker — voir plus bas), abonnements 2000 F/mois, 15 000 F/an, design personnalisé 5 000 F,
   tous les designs 50 000 F/an (activation automatique après paiement, code en secours)
@@ -32,6 +33,49 @@ npm run preview    # prévisualiser le build
   (le filleul ne reçoit rien) — plafond 12 mois/an. Aucun concours, aucun autre bonus de mois gratuits
 - **FAQ, CGU et politique de confidentialité** intégrés (conforme loi n°2017-20 Bénin)
 - **Rappel d'expiration** d'abonnement, carnet de clients, filigrane de statut
+
+## Design personnalisé (5 000 F) : fabriquer et livrer le fichier
+
+Le client qui achète l'offre « Design Personnalisé » reçoit **1 mois d'exports illimités**
+en plus du design (sinon il paierait sans pouvoir exporter, s'il est déjà à 20 exports).
+Le design lui-même n'est pas un code dans l'application : c'est **un fichier que vous
+fabriquez et qu'il importe**. Aucun redéploiement, aucun compte, aucun serveur impliqué.
+
+| Étape | Qui | Quoi |
+| --- | --- | --- |
+| 1 | Client | Paie (caisse automatique Chariow, ou Mobile Money + votre numéro). L'offre s'active, un mois d'exports avec. |
+| 2 | Client | Bouton **« PRO »** → carte **« Importer mon design »** → *pas encore de fichier* → il vous écrit sur WhatsApp (`VENDOR.WHATSAPP`) pour décrire ce qu'il veut. |
+| 3 | **Vous** | `cp scripts/design-example.tsx src/templates/DesignDupont.tsx`, vous adaptez la mise en page. |
+| 4 | **Vous** | `npm run design:pack src/templates/DesignDupont.tsx --name "Design Dupont" --desc "Bloc client en bandeau" --author "Atelier Kpodé"` → écrit `src/templates/DesignDupont.dddesign.js` (≈ 7 ko). |
+| 5 | **Vous** | Envoyez ce fichier `.dddesign.js` au client (WhatsApp, email, clé USB : c'est un fichier comme un autre). |
+| 6 | Client | Carte « Importer mon design » → *Choisir le fichier reçu* (ou il colle son contenu). Le modèle apparaît dans l'onglet **STYLE**, à lui seul. |
+| 7 | Vous (si correction) | Vous modifiez le `.tsx`, vous re-packez, vous renvoyez le fichier ; il clique « Remplacer par un nouveau fichier ». |
+
+**Le fichier** : en-tête signé (JSON des métadonnées + HMAC-SHA256 en fin de fichier), puis le
+code du modèle en CommonJS, `react` et `react/jsx-runtime` laissés **externes** — c'est
+l'application qui les fournit à l'exécution, donc le design importé utilise bien le React de
+l'app (deux copies de React casseraient les hooks). L'application **refuse** : un fichier sans
+en-tête, un fichier modifié (ne serait-ce qu'un caractère), une signature qui ne vient pas
+d'elle, plus de 250 ko, ou un fichier qui n'exporte pas de composant. Un design importé est
+conservé dans le `localStorage` de l'appareil **et voyage dans la sauvegarde JSON**
+(« Exporter une copie »), avec revérification de la signature à la restauration.
+
+**Contrat du modèle** (`scripts/design-example.tsx` est le gabarit commenté) : un composant
+exporté par défaut, props `{ data, svgRef }`, qui renvoie **un seul** `<svg>` en
+`viewBox="0 0 794 <hauteur>"` (794 = A4 à 96 dpi, 1123 = une page), avec `svgRef` attaché au
+`<svg>` (c'est par là que passe l'export PDF). Des `<text>` uniquement — le PDF ne rend pas le
+HTML, donc pas de `foreignObject` ; la couleur vient de `data.accentColor`, la police de
+`data.fontFamily`, le filigrane de statut de `WATERMARK_LABEL[data.status]`. Hooks acceptés,
+rendu synchrone (pas de `fetch` : le composant est appelé à chaque rendu, y compris pour
+l'export).
+
+**Ce que ça ne fait pas** (à savoir avant de vendre) : le design est stocké sur l'appareil du
+client, il n'est donc pas visible des autres utilisateurs — mais il n'est pas chiffré non plus
+(qui ouvre le fichier le lit). Le secret de signature est dans le bundle public : la signature
+écarte les fichiers qui traînent et les modifications accidentelles, ce n'est pas une
+protection contre un attaquant déterminé. Le `#/vendeur` reste le seul endroit où vous
+émettez les codes ; la liste des designs livrés, elle, vit dans le `localStorage` du client —
+gardez une copie de vos `.tsx` (c'est votre archive).
 
 ## Page d'accueil publique (landing)
 

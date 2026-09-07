@@ -10,7 +10,8 @@ import TemplatePurple from './TemplatePurple';
 import TemplateCorporate from './TemplateCorporate';
 import TemplateModernOrange from './TemplateModernOrange';
 import TemplateCleanGradient from './TemplateCleanGradient';
-import { TemplateId, TemplateInfo } from '../types';
+import { BuiltinTemplateId, TemplateId, TemplateInfo } from '../types';
+import { customTemplateInfo, getInstalledDesign, onDesignChange } from '../lib/customDesign';
 
 export const TEMPLATES: TemplateInfo[] = [
   { id: 'modern',    name: 'Modern',     description: 'Swiss contemporain, bandeau coloré' },
@@ -27,7 +28,7 @@ export const TEMPLATES: TemplateInfo[] = [
   { id: 'cleangradient', name: 'Clean Gradient', description: 'Bulles dégradées, pilules sombres, épuré' },
 ];
 
-export const TEMPLATE_COMPONENTS: Record<TemplateId, typeof TemplateModern> = {
+export const TEMPLATE_COMPONENTS: Record<BuiltinTemplateId, typeof TemplateModern> = {
   modern: TemplateModern,
   classic: TemplateClassic,
   minimal: TemplateMinimal,
@@ -41,5 +42,22 @@ export const TEMPLATE_COMPONENTS: Record<TemplateId, typeof TemplateModern> = {
   modernorange: TemplateModernOrange,
   cleangradient: TemplateCleanGradient,
 };
+
+/** Les modèles proposés au client : les 12 embarqués + le design importé, s'il y en a un. */
+export function allTemplates(): TemplateInfo[] {
+  const mine = customTemplateInfo();
+  return mine ? [...TEMPLATES, mine] : TEMPLATES;
+}
+
+/** Composant d'un modèle (importé ou embarqué). 'custom' retombe sur Modern si le fichier a été retiré. */
+export function resolveTemplate(id: TemplateId): typeof TemplateModern {
+  if (id === 'custom') {
+    const d = getInstalledDesign();
+    if (d) return d.component as unknown as typeof TemplateModern;
+  }
+  return TEMPLATE_COMPONENTS[id as BuiltinTemplateId] || TEMPLATE_COMPONENTS.modern;
+}
+
+export { onDesignChange };
 
 export { TemplateModern, TemplateClassic, TemplateMinimal, TemplateCreative, TemplateStudio, TemplateArchitect, TemplateAdapted, TemplateMinimalist, TemplatePurple, TemplateCorporate, TemplateModernOrange, TemplateCleanGradient };
