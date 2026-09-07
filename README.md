@@ -15,7 +15,9 @@ npm run preview    # prévisualiser le build
 
 ## Fonctionnalités
 
-- **Application web, sans installation** : un seul fichier `dist/index.html`, servi par Netlify
+- **Application web, sans installation — mais avec connexion** : un seul fichier `dist/index.html`,
+  servi par Netlify (pas de mode hors-ligne : sans réseau, la page ne se charge pas ; en revanche
+  les documents sont enregistrés sur l'appareil au fil de l'eau)
   (`https://devisdesigner.netlify.app/`) ; ajoutable à l'écran d'accueil du téléphone
 - **12 templates de devis/factures** personnalisables (couleurs, polices, logo, conditions)
 - **Édition directe** : toucher/cliquer un texte sur l'aperçu pour le modifier (n'importe quel texte)
@@ -45,7 +47,7 @@ devis-designer/
     ├── App.tsx         # Composant racine
     ├── components/     # Paywall, Espace vendeur (VendorPage), FAQ, Legal, Onboarding...
     ├── templates/      # Les 12 templates SVG
-    ├── lib/            # license (codes/hors-ligne), quota (compteur serveur), referral
+    ├── lib/            # license (codes émis en local), quota (compteur serveur), referral
     │                   # (parrainage), adminKey (clé ADMIN_PASS), config, store...
     ├── store.ts        # Persistance localStorage + sauvegarde JSON
     ├── types.ts        # Types partagés
@@ -64,6 +66,10 @@ devis-designer/
 | **Parrainage** | 0 F | **1 mois offert au parrain** par parrainage valide (max. 12 mois / 12 mois glissants) |
 
 ### Comment ça marche (sans serveur)
+
+> ⚠️ « Sans serveur » veut dire : *la vérification des codes et le compteur peuvent
+> fonctionner sans backend*. **L'application, elle, a besoin d'internet** pour s'ouvrir
+> (c'est un site web servi par Netlify) — il n'y a pas de mode hors-ligne ni de PWA.
 1. Le client crée ses devis librement. Chaque **export PDF** ou **envoi pour signature** consomme 1 des 20 gratuits.
 2. Épuisé → le client paie via **Chariow** (Mobile Money : MTN MoMo, Orange Money, Wave, Moov — commission 15 %).
 3. Vous générez un **code d'activation** depuis la page vendeur réservée (voir « Espace vendeur » ci-dessous).
@@ -258,7 +264,7 @@ aucune contrepartie, et il n'existe aucun concours ni autre dispositif de mois g
 | **Condition de validité** | Le filleul doit avoir **exporté au moins un document** (PDF ou envoi pour signature) |
 | **Récompense** | +1 mois offert **au parrain** : code remerciement transmis sur WhatsApp puis collé dans « Déjà abonné ? » |
 | **Émission par le Worker** | `POST /referral/export` : le serveur compte l'export du filleul, n'émet **qu'une** récompense par installation de filleul et applique le plafond de 12 mois / parrain (12 mois glissants). Repli local automatique si le Worker est injoignable |
-| **Bascule** | `REFERRAL_VIA_WORKER` dans `src/lib/config.ts` (`false` = 100 % hors-ligne) |
+| **Bascule** | `REFERRAL_VIA_WORKER` dans `src/lib/config.ts` (`false` = émission des récompenses uniquement en local, sans serveur) |
 | **Anti-abus optionnel** | variable Worker `REF_MIN_AGE_HOURS` : âge minimal (heures) d'une installation avant que son export valide un parrainage (0 = désactivé) |
 | **Code nominatif** | Le code récompense est lié à l'installation du parrain : refusé ailleurs. Activable 30 jours |
 | **Plafond** | 12 mois offerts maximum sur 12 mois glissants, par parrain |

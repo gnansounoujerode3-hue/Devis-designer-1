@@ -43,7 +43,7 @@ const LS_PARRAIN = 'dd_ref_parrain';
 const LS_MY_REWARD = 'dd_ref_reward_code';
 /** Le filleul a-t-il transmis le code à son parrain ? (simple aide-mémoire local) */
 const LS_MY_REWARD_SENT = 'dd_ref_reward_sent';
-/** Émetteur de la récompense : 'server' (Worker) ou 'local' (hors-ligne). */
+/** Émetteur de la récompense : 'server' (Worker) ou 'local' (serveur non joint). */
 const LS_REWARD_SOURCE = 'dd_ref_reward_source';
 /** État du Worker : JSON { ok, at } */
 const LS_WORKER_STATE = 'dd_ref_worker';
@@ -231,7 +231,7 @@ export function isParrainCapped(): boolean {
   return getItem(LS_PARRAIN_CAPPED) === '1';
 }
 
-/** Récompense locale (hors-ligne) : signée par le secret de l'app, 1 seule fois. */
+/** Récompense émise localement (serveur non joint) : signée par le secret de l'app, 1 seule fois. */
 async function generateLocalReward(parrain: string): Promise<string | null> {
   try {
     const code = await generateCode('REFERRAL', REF_REWARD_MONTHS, parrain);
@@ -328,9 +328,9 @@ export function parrainStatusLabel(): string {
   return base + ' ' + controlLabel();
 }
 
-/** D'où vient le contrôle des récompenses : serveur (Worker) ou hors-ligne. */
+/** D'où vient le contrôle des récompenses : serveur (Worker) ou local. */
 export function controlLabel(): string {
-  if (!isWorkerReferralEnabled()) return 'Contrôle hors-ligne : Worker non configuré.';
+  if (!isWorkerReferralEnabled()) return 'Contrôle local : Worker non configuré.';
   const st = getWorkerState();
   if (!st) return 'Serveur non interrogé pour l\'instant : le parrainage sera confirmé au premier échange.';
   if (!st.ok) return 'Worker injoignable : récompense générée localement (1 par filleul, 12 mois/an).';

@@ -16,7 +16,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'L\'application fonctionne-t-elle sans internet ?',
-    a: `Oui pour l'essentiel : créer, modifier, consulter et sauvegarder vos devis se fait hors-ligne, et vos documents restent sur votre appareil. Internet sert au paiement, aux liens de partage WhatsApp et à la vérification du compteur d'exports — si le serveur est injoignable, l'application utilise son compteur local et rien ne se bloque.`,
+    a: `Non. ${VENDOR.APP_NAME} est un site web : il faut une connexion pour l'ouvrir, comme pour n'importe quelle page. Ensuite, tout ce que vous saisissez est enregistré sur votre appareil au fil de l'eau — si le réseau lâche en plein travail, rien n'est perdu : rechargez la page une fois revenu en ligne et vos devis sont là. Internet sert aussi au paiement, aux liens de partage WhatsApp et à la vérification du compteur d'exports et du parrainage. En zone sans couverture, vous ne pourrez donc pas ouvrir l'application : faites vos sauvegardes pendant que vous captez (« Exporter une copie ») pour pouvoir tout réimporter dès que le réseau revient. Un mode « installable » qui fonctionnerait sans réseau (avec cache local de l'application) n'existe pas dans cette version : ce que vous avez saisi est bien gardé sur votre appareil, mais la page elle-même se charge en ligne.`,
   },
   {
     q: 'Quels sont les prix ?',
@@ -24,7 +24,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Combien d\'exports gratuits ai-je droit ?',
-    a: `20 exports par appareil sur 30 jours glissants. Le compteur est tenu par le serveur de l'application à partir d'une empreinte de l'appareil : changer de navigateur, ouvrir une fenêtre privée, effacer les données du site ou réimporter une sauvegarde ne le remet donc pas à zéro. Un compteur local sert de secours quand vous êtes hors-ligne.`,
+    a: `20 exports par appareil sur 30 jours glissants. Le compteur est tenu par le serveur de l'application à partir d'une empreinte de l'appareil : changer de navigateur, ouvrir une fenêtre privée, effacer les données du site ou réimporter une sauvegarde ne le remet donc pas à zéro. Si votre connexion ne permet pas d'atteindre ce serveur au moment de l'export, l'application se rabat sur son compteur local.`,
   },
   {
     q: 'Une fenêtre de navigation privée donne-t-elle des exports gratuits en plus ?',

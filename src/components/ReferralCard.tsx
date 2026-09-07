@@ -92,7 +92,7 @@ export default function ReferralCard() {
                   <span className="block mt-1 text-[9px] text-[#999]">
                     {getRewardSource() === 'server'
                       ? 'Code émis et plafonné par le serveur : un seul exemplaire au monde pour ce parrainage.'
-                      : 'Code émis hors-ligne (serveur non joint).'}
+                      : 'Code émis en local (serveur non joint).'}
                   </span>
                 </div>
                 <a

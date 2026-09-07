@@ -16,8 +16,10 @@
    4. au-delà du plafond, le client peut FORMULER une demande de déblocage
       (POST /quota/request) que le vendeur traite en 1 clic (#/vendeur).
 
-   Si le serveur est injoignable (vol, réseau, Worker non déployé), on retombe
-   sur le compteur local : un client légitime hors-ligne n'est jamais bloqué.
+   Si le serveur est injoignable (réseau instable, Worker non déployé), on retombe
+   sur le compteur local : un client dont le serveur est injoignable n'est jamais
+   bloqué à cause du réseau (l'application reste de toute façon un site web :
+   sans connexion, elle ne s'ouvre pas).
    ============================================================ */
 
 import { FREE_EXPORT_LIMIT, getExportCount, isLicensed, loadLicense } from './license';
@@ -210,7 +212,7 @@ export async function quotaReserve(): Promise<QuotaState> {
   }
   const data = await callWorkerRaw('/quota/reserve', await payload(), 8000);
   if (!data || data.ok !== true) {
-    const s = localState();          // serveur injoignable : on ne punit pas le hors-ligne
+    const s = localState();          // serveur injoignable : on ne punit pas une panne réseau
     remember({ ...s, source: 'local' });
     return s;
   }

@@ -43,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.0.6';
+export const APP_VERSION = '1.0.7';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'textes à jour (FAQ, CGU, confidentialité) + lien de parrainage (2026-09-07)';
+export const BUILD_TAG = 'textes à jour : plus de promesse de mode hors-ligne (2026-09-07)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).
@@ -66,9 +66,11 @@ export const AUTO_PAY_WORKER_URL = 'https://devisdesigner.gnansounoujerode3.work
            1 seule récompense par installation de filleul, plafond de 12 mois
            par parrain sur 12 mois glissants, codes signés côté serveur
            (impossibles à fabriquer dans le navigateur).
-           Si le Worker est injoignable (vol hors-ligne), l'application
+           Si le Worker est injoignable (réseau en panne, Worker arrêté), l'application
            retombe automatiquement sur la génération locale.
-   false : fonctionnement 100 % hors-ligne uniquement (génération locale).
+   false : émission uniquement locale, sans jamais interroger de serveur.
+           Attention : l'application elle-même reste un site web et exige une
+           connexion pour s'ouvrir — « local » ne concerne que l'émission des codes.
    ------------------------------------------------------------------ */
 export const REFERRAL_VIA_WORKER = true;
 

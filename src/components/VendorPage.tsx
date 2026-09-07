@@ -329,7 +329,7 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
             {!isWorkerReferralEnabled() ? (
               <div className="text-[11px] text-[#999]">
                 Worker non configuré (<code>AUTO_PAY_WORKER_URL</code> vide) : le parrainage fonctionne uniquement
-                hors-ligne, sans suivi centralisé.
+                en local, sans suivi centralisé (ni plafonds côté serveur).
               </div>
             ) : !wstats ? (
               <div className="text-[11px] text-[#999]">Aucune donnée reçue du serveur pour l'instant.</div>
