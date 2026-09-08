@@ -105,7 +105,7 @@ def chip(draw, ty, x, y, label, size=26):
     return w
 
 
-def mock_document(img, ty, box):
+def mock_document(img, ty, box, stamp="ACCEPTÉ"):
     """Aperçu d'un devis dessiné aux proportions A4 : c'est le « visuel » du produit."""
     x0, y0, x1, y1 = box
     pw, ph = x1 - x0, y1 - y0
@@ -192,10 +192,17 @@ def mock_document(img, ty, box):
         pts.append((px, py))
     d.line(pts, fill=(70, 70, 70, 200), width=3, joint="curve")
     ty.text(d, (x0 + m, fy + 2), "Signature du client · 07/09/2026", int(pw * 0.03), FAINT)
-    stamp = "BROUILLON"
-    sw = ty.width(d, stamp, int(pw * 0.034), bold=True)
-    rrect(d, (x1 - m - sw - 24, fy - 6, x1 - m, fy + int(pw * 0.058)), 6, outline=(198, 205, 216), width=2)
-    ty.text(d, (x1 - m - sw - 12, fy + 2), stamp, int(pw * 0.034), (150, 158, 172), bold=True, tracking=1)
+    # Tampon d'état du faux document. Il doit rester cohérent avec ce qui est dessiné
+    # juste à côté : la ligne « Signature du client » datée. Un tampon BROUILLON sur un
+    # devis déjà signé racontait le contraire du visuel — d'où --stamp, et ACCEPTÉ par défaut.
+    stamp = str(stamp or "").strip().upper()
+    if stamp:
+        ok_state = stamp in ("ACCEPTÉ", "ACCEPTE", "SIGNÉ", "SIGNE", "PAYÉ", "PAYE")
+        line = (176, 214, 196) if ok_state else (198, 205, 216)
+        ink = (12, 128, 92) if ok_state else (150, 158, 172)
+        sw = ty.width(d, stamp, int(pw * 0.034), bold=True)
+        rrect(d, (x1 - m - sw - 24, fy - 6, x1 - m, fy + int(pw * 0.058)), 6, outline=line, width=2)
+        ty.text(d, (x1 - m - sw - 12, fy + 2), stamp, int(pw * 0.034), ink, bold=True, tracking=1)
 
 
 def main() -> int:
@@ -207,6 +214,8 @@ def main() -> int:
     ap.add_argument("--sub", default="12 modèles, signature du client, export PDF vectoriel.")
     ap.add_argument("--chips", default="20 exports offerts|XOF · EUR · USD|Mobile Money")
     ap.add_argument("--url", default="devis-designer-app.jerode.workers.dev")
+    ap.add_argument("--stamp", default="ACCEPTÉ",
+                    help="tampon d'état du faux document ; '' pour n'en mettre aucun")
     ap.add_argument("--note", default="Aucune installation, aucun compte.",
                     help="ligne discrète sous le domaine ; '' pour l'omettre")
     a = ap.parse_args()
@@ -333,7 +342,7 @@ def main() -> int:
 
     # --- colonne de droite : le document ---
     doc_w, doc_h = 372, 526
-    mock_document(img, ty, (W - pad - doc_w + 26, (H - doc_h) // 2 - 4, W - pad + 26, (H - doc_h) // 2 - 4 + doc_h))
+    mock_document(img, ty, (W - pad - doc_w + 26, (H - doc_h) // 2 - 4, W - pad + 26, (H - doc_h) // 2 - 4 + doc_h), a.stamp)
 
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     out = img.convert("RGB")

@@ -247,7 +247,10 @@ python3 scripts/make-og-image.py --title "…" --sub "…" --chips "a|b|c" --url
 Le visuel est **dessiné par le script** (aucune capture d'écran) : le texte et la
 mise en page de la vignette se règlent donc comme du code, et le faux document de droite
 suit les proportions A4 réelles (794×1123). `index.html` porte les balises ; le script
-accepte `--size`, `--logo`, `--note` (et `--note ""` pour retirer la ligne discrète). Le pied de
+accepte `--size`, `--logo`, `--note` (et `--note ""` pour retirer la ligne discrète),
+`--title`, `--sub`, `--chips` (séparés par `|`) et `--stamp` — le tampon d'état du faux
+document, `ACCEPTÉ` par défaut : il doit rester cohérent avec la ligne « Signature du client »
+datée juste à côté, et `--stamp ""` le retire. Le pied de
 la vignette s'adapte tout seul : la pastille d'adresse garde sa taille tant qu'elle tient dans la
 colonne, la note se réduit, puis descend sous la pastille si la ligne est pleine — **l'adresse n'est
 jamais tronquée**, c'est le seul truc que le visiteur doit retenir. Un sous-domaine de compte à
