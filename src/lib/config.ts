@@ -43,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'jusqu\'à 6 designs importés (emplacements numérotés) + suites de tests dans le dépôt (2026-09-07)';
+export const BUILD_TAG = 'carnet d\'émetteurs : la fiche du documentaire est enregistrée et pré-remplit chaque nouveau document (2026-09-08)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).

@@ -4,9 +4,9 @@ import { jsPDF } from 'jspdf';
 import QuoteSVG from './components/QuoteSVG';
 import FontPicker from './components/FontPicker';
 import SignatureModal from './components/SignatureModal';
-import { QuoteData, QuoteItem, CurrencyCode, CURRENCIES, formatMoney, DocStatus, STATUS_META, SavedClient, WATERMARK_LABEL } from './types';
+import { QuoteData, QuoteItem, CurrencyCode, CURRENCIES, formatMoney, DocStatus, STATUS_META, SavedClient, SavedEmitter, WATERMARK_LABEL } from './types';
 import { allTemplates, onDesignChange } from './templates';
-import { createDefaultDoc, newItemRow, loadAllDocs, saveDoc, deleteDoc, duplicateDoc, convertToInvoice, loadClients, saveClient, deleteClient, getNextNumber } from './store';
+import { createDefaultDoc, newItemRow, loadAllDocs, saveDoc, deleteDoc, duplicateDoc, convertToInvoice, loadClients, saveClient, deleteClient, getNextNumber, loadEmitters, saveEmitter, deleteEmitter, setDefaultEmitter, getDefaultEmitterId } from './store';
 import { buildSignatureHtml } from './lib/generateSignHtml';
 import PaywallModal from './components/PaywallModal';
 import ReferralToast from './components/ReferralToast';
@@ -107,6 +107,11 @@ export default function App() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [clientBook, setClientBook] = useState(false);
   const [clients, setClients] = useState<SavedClient[]>([]);
+  /* Carnet d'émetteurs : la fiche de l'entreprise, réutilisée d'un document à l'autre. */
+  const [emitters, setEmitters] = useState<SavedEmitter[]>([]);
+  const [emitterBook, setEmitterBook] = useState(false);
+  const [defaultEmitterId, setDefaultEmitterId] = useState('');
+  const [emitterMsg, setEmitterMsg] = useState('');
   const [sigModal, setSigModal] = useState<'designer' | 'client' | null>(null);
   const [presentMode, setPresentMode] = useState(false);
   const [quickEdit, setQuickEdit] = useState(false);
@@ -137,7 +142,7 @@ export default function App() {
   const exportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); localStorage.setItem('devis_dark', dark ? '1' : '0'); }, [dark]);
-  useEffect(() => { setDocs(loadAllDocs()); setClients(loadClients()); }, []);
+  useEffect(() => { setDocs(loadAllDocs()); setClients(loadClients()); setEmitters(loadEmitters()); setDefaultEmitterId(getDefaultEmitterId()); }, []);
   // Restaure le compteur d'exports depuis la sauvegarde IndexedDB (anti-reset)
   useEffect(() => {
     restoreExportCountFromBackup().then(() => { setLicenseTick(t => t + 1); return quotaRefresh(); })
@@ -250,6 +255,34 @@ export default function App() {
   const handleSaveClient = () => { const c: SavedClient = { id: uid(), name: data.clientName, company: data.clientCompany, email: data.clientEmail, address: data.clientAddress }; saveClient(c); setClients(loadClients()); };
   const handleLoadClient = (c: SavedClient) => { setData(p => ({ ...p, clientName: c.name, clientCompany: c.company, clientEmail: c.email, clientAddress: c.address })); setClientBook(false); };
   const handleDeleteClient = (id: string) => { deleteClient(id); setClients(loadClients()); };
+
+  /* ---- Carnet d'émetteurs ---- */
+  const refreshEmitters = () => { setEmitters(loadEmitters()); setDefaultEmitterId(getDefaultEmitterId()); };
+  /** Enregistre (ou met à jour) la fiche de l'émetteur du document en cours. */
+  const handleSaveEmitter = () => {
+    const name = data.designerName.trim();
+    if (!name) { setEmitterMsg('Renseignez d’abord votre nom ou votre société : c’est lui qui sert de titre à la fiche.'); return; }
+    const found = emitters.find(e => e.name.trim().toLowerCase() === name.toLowerCase());
+    const r = saveEmitter({
+      id: found?.id || uid(), label: name.slice(0, 28), name,
+      title: data.designerTitle, email: data.designerEmail, phone: data.designerPhone,
+      address: data.designerAddress, siret: data.designerSiret, logo: data.designerLogo,
+    });
+    refreshEmitters();
+    setEmitterMsg(r.saved
+      ? `${found ? 'Fiche mise à jour' : 'Fiche enregistrée'} — vos nouveaux devis seront pré-remplis${r.withLogo ? '' : ' (logo non conservé : stockage du navigateur plein)'}.`
+      : 'Enregistrement impossible : le stockage du navigateur est plein.');
+  };
+  const handleLoadEmitter = (e: SavedEmitter) => {
+    setData(p => ({
+      ...p, designerName: e.name, designerTitle: e.title, designerEmail: e.email,
+      designerPhone: e.phone, designerAddress: e.address, designerSiret: e.siret, designerLogo: e.logo,
+    }));
+    setEmitterBook(false);
+    setEmitterMsg(`« ${e.label} » appliqué au document en cours.`);
+  };
+  const handleDeleteEmitter = (id: string) => { deleteEmitter(id); refreshEmitters(); setEmitterMsg('Fiche retirée du carnet.'); };
+  const handleDefaultEmitter = (id: string) => { setDefaultEmitter(id); refreshEmitters(); setEmitterMsg('Cette fiche pré-remplira les nouveaux documents.'); };
 
   /* ---- Édition directe : cliquer sur un texte du document ---- */
 
@@ -817,7 +850,38 @@ export default function App() {
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* TAB 0 */}
             {tab === 0 && (<>
-              <Label text="Informations emetteur" accent={data.accentColor} dark={dark} />
+              <div className="flex items-center justify-between">
+                <Label text="Informations emetteur" accent={data.accentColor} dark={dark} />
+                <button onClick={() => { setEmitterBook(b => !b); setEmitterMsg(''); }} className={`text-[10px] font-bold tracking-widest px-3 py-1.5 rounded-lg border transition-colors ${dark ? 'border-zinc-700 hover:bg-zinc-800' : 'border-[#E0E0E0] hover:bg-[#F5F5F5]'}`} style={{ color: data.accentColor }}>{emitterBook ? 'FERMER' : 'MON CARNET'}</button>
+              </div>
+              {emitterBook ? (
+                <div className="space-y-2">
+                  {emitters.length === 0 ? (
+                    <div className="text-sm text-[#999] text-center py-6">Aucune fiche enregistrée</div>
+                  ) : emitters.map(e => {
+                    const isDef = e.id === defaultEmitterId;
+                    return (
+                      <div key={e.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${dark ? 'border-zinc-700 hover:bg-zinc-800' : 'border-[#E8E8E8] hover:bg-[#FAFAFA]'}`}>
+                        {e.logo
+                          ? <img src={e.logo} alt="" className="w-8 h-8 rounded object-contain bg-white border border-[#EEE] dark:border-zinc-700 shrink-0" />
+                          : <span className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-[11px] font-black bg-[#F2F2F2] dark:bg-zinc-800" style={{ color: data.accentColor }}>{(e.label || '?').trim().slice(0, 1).toUpperCase()}</span>}
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleLoadEmitter(e)}>
+                          <div className={`text-sm font-bold truncate ${dark ? 'text-white' : 'text-[#222]'}`}>{e.label}</div>
+                          <div className="text-[10px] text-[#999] truncate">{[e.phone, e.email].filter(Boolean).join(' · ') || 'sans coordonnées'}</div>
+                        </div>
+                        {isDef
+                          ? <span className="text-[9px] font-black tracking-wider shrink-0" style={{ color: data.accentColor }}>PAR DÉFAUT</span>
+                          : <button onClick={() => handleDefaultEmitter(e.id)} className="text-[10px] font-bold tracking-wider hover:opacity-70 shrink-0" style={{ color: data.accentColor }}>DÉFAUT</button>}
+                        <button onClick={() => handleDeleteEmitter(e.id)} className="text-red-400 hover:text-red-600 text-[10px] font-bold tracking-wider shrink-0">SUPPR</button>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-[#999] leading-relaxed">
+                    Une fiche portant le même nom que le vôtre est <b>mise à jour</b> au lieu d’être dupliquée.
+                    Celle marquée « par défaut » remplit toute seule l’en-tête des nouveaux documents.
+                  </p>
+                </div>
+              ) : (<>
               <div>
                 <label className={`text-[11px] font-bold tracking-wider uppercase mb-2 block ${dark ? 'text-zinc-400' : 'text-[#999]'}`}>LOGO</label>
                 {data.designerLogo ? (
@@ -841,6 +905,13 @@ export default function App() {
               </div>
               <Input label="Adresse" value={data.designerAddress} onChange={v => set('designerAddress', v)} accent={data.accentColor} dark={dark} />
               <Input label="N SIRET" value={data.designerSiret} onChange={v => set('designerSiret', v)} accent={data.accentColor} dark={dark} />
+                {data.designerName.trim() ? (
+                  <button onClick={handleSaveEmitter} className="w-full py-2 rounded-lg border-2 border-dashed text-xs font-bold tracking-wider transition-colors hover:bg-[#FAFAFA] dark:hover:bg-zinc-800" style={{ borderColor: data.accentColor + '40', color: data.accentColor }}>+ SAUVEGARDER CETTE FICHE</button>
+                ) : (
+                  <p className="text-[10px] text-[#999]">Renseignez d’abord votre nom ou votre société : c’est lui qui sert de titre à la fiche.</p>
+                )}
+                {emitterMsg && <div className={`text-[10.5px] font-bold ${dark ? 'text-zinc-300' : 'text-[#666]'}`}>{emitterMsg}</div>}
+              </>)}
             </>)}
             {/* TAB 1 */}
             {tab === 1 && (<>

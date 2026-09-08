@@ -101,6 +101,26 @@ export interface SavedClient {
 }
 
 /**
+ * Un émetteur enregistré — le pendant du carnet de clients pour VOTRE fiche :
+ * tout ce qui remplit l'en-tête d'un devis. Le journal sert à ne pas retaper
+ * ses coordonnées à chaque nouveau document, et à tenir plusieurs casiers
+ * (une entreprise, une antenne, une marque) sur le même appareil.
+ */
+export interface SavedEmitter {
+  id: string;
+  /** Nom court affiché dans le carnet (« Atelier Kpodé », « Agence Nord »). */
+  label: string;
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  address: string;
+  siret: string;
+  /** Logo en dataURL. Peut être lourd : il saute de lui-même si le stockage est plein. */
+  logo: string;
+}
+
+/**
  * Les 12 modèles embarqués, plus les designs sur mesure importés par le client :
  * « custom » = 1er emplacement (nom historique), « custom-2 » … « custom-6 » ensuite.
  */

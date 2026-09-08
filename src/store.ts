@@ -1,11 +1,15 @@
-import { DocType, QuoteData, QuoteItem, SavedClient } from './types';
+import { DocType, QuoteData, QuoteItem, SavedClient, SavedEmitter } from './types';
 import { getExportCount, setExportCountAtLeast } from './lib/license';
 import { adoptDesignBlobs, designBlobsForBackup } from './lib/customDesign';
 
 const DOCS_KEY = 'devis_designer_docs';
 const CLIENTS_KEY = 'devis_designer_clients';
+const EMITTERS_KEY = 'devis_designer_emitters';
+const EMITTER_DEFAULT_KEY = 'devis_designer_emitter_default';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+/** Une clé de stockage n'est jamais fiable : tout passe par là à la lecture. */
+const toStr = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
 
 export function getNextNumber(docType: DocType): string {
   const year = new Date().getFullYear();
@@ -24,17 +28,20 @@ export function createDefaultDoc(partial?: Partial<QuoteData>): QuoteData {
   const now = Date.now();
   const docType = partial?.docType || 'devis';
   const autoNum = getNextNumber(docType);
+  /* L'émetteur marqué « par défaut » dans le carnet pré-remplit l'en-tête : c'est la
+     fin du « je retape mes coordonnées à chaque devis ». Un `partial` explicite gagne. */
+  const mine = defaultEmitter();
   return {
     id: uid(),
     docType,
     status: 'brouillon',
-    designerName: '',
-    designerTitle: '',
-    designerEmail: '',
-    designerPhone: '',
-    designerAddress: '',
-    designerSiret: '',
-    designerLogo: '',
+    designerName: mine?.name || '',
+    designerTitle: mine?.title || '',
+    designerEmail: mine?.email || '',
+    designerPhone: mine?.phone || '',
+    designerAddress: mine?.address || '',
+    designerSiret: mine?.siret || '',
+    designerLogo: mine?.logo || '',
     clientName: '',
     clientCompany: '',
     clientEmail: '',
@@ -217,13 +224,81 @@ export function saveClient(c: SavedClient) { const clients = loadClients(); cons
 export function deleteClient(id: string) { localStorage.setItem(CLIENTS_KEY, JSON.stringify(loadClients().filter(c => c.id !== id))); }
 
 /* ============================================================
+   CARNET D'ÉMETTEURS — la fiche de VOTRE entreprise, réutilisée
+   ------------------------------------------------------------
+   Mêmes règles que le carnet de clients : stockage local, normalisation
+   à la lecture (données anciennes ou bricolées à la main), upsert par id.
+   L'émetteur marqué « par défaut » pré-remplit chaque nouveau document.
+   ============================================================ */
+
+export function loadEmitters(): SavedEmitter[] {
+  try {
+    const raw = localStorage.getItem(EMITTERS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as (Partial<SavedEmitter> & Record<string, unknown>)[];
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(e => e && typeof e === 'object').map(e => ({
+      id: typeof e.id === 'string' ? e.id : uid(),
+      label: typeof e.label === 'string' && e.label.trim() ? e.label : (typeof e.name === 'string' ? e.name : 'Émetteur'),
+      name: toStr(e.name), title: toStr(e.title), email: toStr(e.email), phone: toStr(e.phone),
+      address: toStr(e.address), siret: toStr(e.siret), logo: toStr(e.logo),
+    }));
+  } catch { return []; }
+}
+
+/** Écrit le carnet. Un logo PNG en dataURL pèse lourd : si le stockage refuse,
+    on garde les textes et on lâche les logos — la fiche reste utilisable. */
+function persistEmitters(list: SavedEmitter[]): { saved: boolean; withLogo: boolean } {
+  try { localStorage.setItem(EMITTERS_KEY, JSON.stringify(list)); return { saved: true, withLogo: true }; }
+  catch {
+    try {
+      localStorage.setItem(EMITTERS_KEY, JSON.stringify(list.map(e => ({ ...e, logo: '' }))));
+      return { saved: true, withLogo: false };
+    } catch { return { saved: false, withLogo: false }; }
+  }
+}
+
+export function saveEmitter(e: SavedEmitter): { saved: boolean; withLogo: boolean } {
+  const list = loadEmitters();
+  const idx = list.findIndex(x => x.id === e.id);
+  if (idx >= 0) list[idx] = e; else list.unshift(e);
+  const r = persistEmitters(list);
+  if (!localStorage.getItem(EMITTER_DEFAULT_KEY)) localStorage.setItem(EMITTER_DEFAULT_KEY, e.id);
+  return r;
+}
+
+export function deleteEmitter(id: string) {
+  const rest = loadEmitters().filter(e => e.id !== id);
+  persistEmitters(rest);
+  if (localStorage.getItem(EMITTER_DEFAULT_KEY) === id) {
+    if (rest[0]) localStorage.setItem(EMITTER_DEFAULT_KEY, rest[0].id);
+    else localStorage.removeItem(EMITTER_DEFAULT_KEY);
+  }
+}
+
+export function setDefaultEmitter(id: string) { localStorage.setItem(EMITTER_DEFAULT_KEY, id); }
+
+export function getDefaultEmitterId(): string {
+  try { return localStorage.getItem(EMITTER_DEFAULT_KEY) || defaultEmitter()?.id || ''; } catch { return ''; }
+}
+
+/** L'émetteur qui pré-remplit les nouveaux documents (sinon le premier du carnet). */
+export function defaultEmitter(): SavedEmitter | null {
+  const list = loadEmitters();
+  if (!list.length) return null;
+  const id = localStorage.getItem(EMITTER_DEFAULT_KEY);
+  return list.find(e => e.id === id) || list[0];
+}
+
+/* ============================================================
    Sauvegarde / restauration complète (export & import JSON)
    ============================================================ */
 
 export interface BackupData {
   app: 'devis-designer';
-  /** v2 : le compteur d'exports voyage avec la sauvegarde (anti « navigation privée »). */
-  version: 2;
+  /** v2 : le compteur d'exports voyage avec la sauvegarde (anti « navigation privée »).
+      v3 : le carnet d'émetteurs (et le choix par défaut) voyage aussi. */
+  version: 3;
   exportedAt: string;
   docs: QuoteData[];
   clients: SavedClient[];
@@ -234,6 +309,9 @@ export interface BackupData {
    * changement de poste ferait perdre les modèles payés 5 000 F pièce. Chacun est
    * revérifié à la restauration, donc un fichier édité à la main est rejeté.
    */
+  /** Carnet d'émetteurs : sans lui, changer de poste = retaper ses coordonnées. */
+  emitters?: SavedEmitter[];
+  emitterDefault?: string;
   customDesigns?: (string | null)[];
   /** @deprecated avant l'époque « plusieurs designs » : un seul blob. */
   customDesign?: string;
@@ -243,10 +321,12 @@ export interface BackupData {
 export function exportAllData(): BackupData {
   return {
     app: 'devis-designer',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     docs: loadAllDocs(),
     clients: loadClients(),
+    emitters: loadEmitters(),
+    emitterDefault: localStorage.getItem(EMITTER_DEFAULT_KEY) || undefined,
     exportCount: getExportCount(),
     customDesigns: designBlobsForBackup(),
   };
@@ -311,10 +391,35 @@ export function importAllData(json: string, mode: 'merge' | 'replace' = 'merge')
     }
     const designNote = restoreDesign(data.customDesigns, data.customDesign);
 
+    /* Le carnet d'émetteurs suit la même logique que les clients — à cette différence
+       près qu'une copie ancienne (avant la clé `emitters`) ne doit SURTOUT pas vider le
+       carnet de l'appareil : l'absence de clé se lit « rien à restaurer », pas « zéro fiche ». */
+    function restoreEmitters(): string {
+      const hasKey = Array.isArray(data.emitters);
+      const incoming = hasKey ? (data.emitters as SavedEmitter[]).filter(e => e && typeof e === 'object') : [];
+      if (data.emitterDefault && incoming.some(e => e.id === data.emitterDefault)) {
+        localStorage.setItem(EMITTER_DEFAULT_KEY, data.emitterDefault);
+      }
+      if (!hasKey) return loadEmitters().length ? ' Fiches émetteurs du carnet conservées (cette copie est plus ancienne).' : '';
+      if (mode === 'replace') {
+        persistEmitters(incoming);
+        return ` ${incoming.length} fiche(s) émetteur(s) restaurée(s).`;
+      }
+      const byKey = new Map(loadEmitters().map(e => [e.name.trim().toLowerCase() || e.id, e]));
+      let added = 0;
+      for (const e of incoming) {
+        const k = e.name.trim().toLowerCase() || e.id;
+        if (!byKey.has(k)) { byKey.set(k, e); added++; }
+      }
+      if (added) persistEmitters(Array.from(byKey.values()));
+      return added ? ` ${added} fiche(s) émetteur(s) ajoutée(s).` : '';
+    }
+    const emitterNote = restoreEmitters();
+
     if (mode === 'replace') {
       saveAllDocs(incomingDocs);
       localStorage.setItem(CLIENTS_KEY, JSON.stringify(incomingClients));
-      return { ok: true, message: `${incomingDocs.length} document(s) et ${incomingClients.length} client(s) restaurés.${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}${designNote}` };
+      return { ok: true, message: `${incomingDocs.length} document(s) et ${incomingClients.length} client(s) restaurés.${emitterNote}${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}${designNote}` };
     }
 
     // Merge : on garde les existants, on ajoute les nouveaux
@@ -330,7 +435,7 @@ export function importAllData(json: string, mode: 'merge' | 'replace' = 'merge')
 
     saveAllDocs(mergedDocs);
     localStorage.setItem(CLIENTS_KEY, JSON.stringify(mergedClients));
-    return { ok: true, message: `${incomingDocs.length} document(s) importé(s) (${mergedDocs.length} au total).${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}${designNote}` };
+    return { ok: true, message: `${incomingDocs.length} document(s) importé(s) (${mergedDocs.length} au total).${emitterNote}${restoredCount ? ` Compteur d'exports : ${restoredCount} consommé(s).` : ''}${designNote}` };
   } catch {
     return { ok: false, message: 'Impossible de lire ce fichier.' };
   }

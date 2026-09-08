@@ -24,8 +24,8 @@ npm run preview    # prévisualiser le build
 - **Édition directe** : toucher/cliquer un texte sur l'aperçu pour le modifier (n'importe quel texte)
 - **Signatures** manuscrites (émetteur + client), envoi pour signature
 - **Export** : PDF (A4 multipages), SVG, présentation plein écran
-- **Sauvegarde / restauration** JSON (export/import de tous les devis + clients, designs
-  importés compris)
+- **Sauvegarde / restauration** JSON (export/import de tous les devis + clients + fiches
+  émetteurs, designs importés compris)
 - **Design personnalisé** : le vendeur livre un fichier `.dddesign.js`, le client l'importe ;
   jusqu'à 6 modèles importés coexistent chez lui. Voir plus bas « Design personnalisé
   (5 000 F) : fabriquer et livrer le fichier » et les suites `npm run test:ui`.
@@ -35,7 +35,7 @@ npm run preview    # prévisualiser le build
 - **Parrainage (seule récompense gratuite)** : 1 parrainage valide = **1 mois offert au parrain**
   (le filleul ne reçoit rien) — plafond 12 mois/an. Aucun concours, aucun autre bonus de mois gratuits
 - **FAQ, CGU et politique de confidentialité** intégrés (conforme loi n°2017-20 Bénin)
-- **Rappel d'expiration** d'abonnement, carnet de clients, filigrane de statut
+- **Rappel d'expiration** d'abonnement, carnet de clients, carnet d'émetteurs, filigrane de statut
 
 ## Design personnalisé (5 000 F) : fabriquer et livrer le fichier
 
@@ -97,18 +97,55 @@ protection contre un attaquant déterminé. Le `#/vendeur` reste le seul endroit
 émettez les codes ; la liste des designs livrés, elle, vit dans le `localStorage` du client —
 gardez une copie de vos `.tsx` (c'est votre archive).
 
+## Carnet d'émetteurs et fichier clients
+
+Les deux carnets sont le même mécanisme appliqué aux deux bouts du document, et l'un sans l'autre
+laisserait le client ressaisir quelque chose :
+
+| | Clients | Émetteurs |
+| --- | --- | --- |
+| Type | `SavedClient` (`src/types.ts`) | `SavedEmitter` (`src/types.ts`) |
+| Clés | `devis_designer_clients` | `devis_designer_emitters` + `devis_designer_emitter_default` |
+| Fonctions | `loadClients` / `saveClient` / `deleteClient` | `loadEmitters` / `saveEmitter` / `deleteEmitter` / `setDefaultEmitter` / `getDefaultEmitterId` |
+| Interface | onglet **Client**, bouton « CARNET » | onglet **Emetteur**, bouton « MON CARNET » |
+| Effet | un tap remplit le bloc client | la fiche **par défaut** pré-remplit `designer*` de tout `createDefaultDoc` |
+
+Quatre règles à connaître (suite `tests/emitter_test.tsx`) :
+
+1. **Le pré-remplissage ne réécrit jamais un document existant.** Il a lieu à la *création* : un
+   `partial` explicite (duplication d'un document, restauration d'une sauvegarde) passe donc avant la
+   fiche par défaut. Les documents déjà enregistrés gardent l'en-tête avec lequel ils ont été faits.
+2. **La fiche par défaut = la première enregistrée.** `setDefaultEmitter` en choisit une autre ;
+   `deleteEmitter` reporte le choix sur la survivante, sinon les nouveaux documents partiraient vides.
+3. **Un nom, une fiche.** L'application cherche la fiche portant le même nom (insensible à la casse et
+   aux espaces de bordure) et réutilise son `id` : « + SAUVEGARDER CETTE FICHE » met à jour au lieu
+   d'empiler les doublons.
+4. **Le logo est sacrificiel.** Un logo est une image en base64 dans la fiche ; si `localStorage`
+   refuse l'écriture (quota), `persistEmitters` réécrit la liste sans les logos et renvoie
+   `withLogo: false` — les coordonnées, elles, sont toujours sauvegardées, et l'interface dit
+   précisément ce qui a été perdu plutôt que de promettre un enregistrement complet.
+
+Côté sauvegarde JSON : `BackupData` est en `version: 3` avec `emitters` et `emitterDefault`. Une copie
+plus ancienne (qui ne contient pas la clé `emitters`) se restaure normalement et **laisse le carnet en
+place** : une clé absente se lit « rien à restaurer », jamais « zéro fiche » — sinon restaurer un vieux
+fichier effacerait l'en-tête enregistré depuis. À la restauration en mode
+« fusion », une fiche importée portant le nom d'une fiche déjà présente est ignorée (le poste local est
+considéré plus à jour), les autres sont ajoutées — comme pour les clients. Le message affiché après
+Restauration énonce le nombre de fiches, pour que personne ne croie avoir perdu son en-tête.
+
 ## Vérifier sans ouvrir le navigateur
 
 ```bash
 npm run test:ui          # ou : npm test
 ```
 
-Deux suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
+Trois suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
 le TSX avec un shim DOM minimal — `tests/shim.js` — et laisse `react`/`react-dom` imports de
 `node_modules`, donc le harness rend avec le même React que l'app) :
 
 | Suite | Ce qu'elle tient |
 | --- | --- |
+| `tests/emitter_test.tsx` | La fiche de l'émetteur : pré-remplissage de tout nouveau document par la fiche par défaut (et victoire d'un en-tête explicite), mise à jour sur place au lieu d'un doublon, choix et report de la fiche par défaut, carnet vidé, repli de quota logo (`{ saved, withLogo }`) jusqu'à l'échec total, sauvegarde JSON `version: 3` (remplacement à l'identique, fusion dédupliquée, copie ancienne qui ne vide rien), et les textes réellement écrits à l'écran, dans la FAQ, sur la landing et dans ce README. |
 | `tests/design_test.tsx` | Tout le trajet du design sur mesure : pack du vendeur → fichier signé → refus des fichiers modifiés, tronqués, trop gros → import → **rendu par le vrai `QuoteSVG`** → emplacements 1 à 6 (ajout, remplacement, plafond, retrait) → sauvegarde JSON et restauration (avec blob falsifié) → code d'activation `DESIGN` → carte d'import dans les deux états. Les gabarits testés sont dans `tests/fixtures/`. |
 | `tests/landing_test.tsx` | La page d'accueil se rend ; ses chiffres viennent des constantes (`PRICE_*`, `FREE_EXPORT_LIMIT`, `TEMPLATES.length`) et non de nombres recopiés ; aucune promesse interdite (mode hors-ligne, téléchargement, témoignages et étoiles inventés, ancien forfait de 3 mois, avoir) ; aucun emoji ; chaque mention du réseau dit la vérité ; la vignette de partage existe, fait 1200×630 et est déclarée sur le bon domaine. |
 

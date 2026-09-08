@@ -51,12 +51,16 @@ const FAQS: { q: string; a: string }[] = [
     a: `Vos devis restent consultables et modifiables. Seuls les nouveaux exports PDF et envois pour signature sont bloqués jusqu'au renouvellement. Un rappel s'affiche 3 jours avant l'expiration.`,
   },
   {
+    q: 'Dois-je retaper mon nom et mon logo à chaque document ?',
+    a: `Non. Dans l'onglet « Emetteur », renseignez votre nom (ou raison sociale), votre fonction, vos coordonnées, votre SIRET et votre logo, puis touchez « + SAUVEGARDER CETTE FICHE ». La fiche enregistrée pré-remplit dès lors l'en-tête de tout nouveau devis ou facture. « MON CARNET » liste vos fiches — plusieurs activités, plusieurs en-têtes — avec une fiche par défaut, et un tap applique une fiche au document en cours. Un nom déjà au carnet met la fiche existante à jour au lieu de la dupliquer.`,
+  },
+  {
     q: 'Comment sauvegarder mes devis ?',
-    a: `Sur la page d'accueil, dans la barre « SAUVEGARDE » : « Exporter une copie » télécharge un fichier JSON contenant tous vos devis et vos clients — ainsi que votre compteur d'exports. « Restaurer une copie » les réimporte, sur le même appareil ou sur un autre.`,
+    a: `Sur la page d'accueil, dans la barre « SAUVEGARDE » : « Exporter une copie » télécharge un fichier JSON contenant tous vos devis, vos clients et vos fiches émetteurs — ainsi que votre compteur d'exports. « Restaurer une copie » les réimporte, sur le même appareil ou sur un autre.`,
   },
   {
     q: 'Puis-je utiliser l\'application sur plusieurs appareils ?',
-    a: `Oui. Exportez une copie sur le premier appareil et restaurez-la sur le second : devis et clients sont fusionnés sans doublons. Deux précisions : chaque appareil conserve son propre compteur d'exports (le quota ne se transfère pas en bonus), et la licence est liée à l'appareil qui l'a activée — pour la déplacer, prévenez le vendeur au ${VENDOR.PHONE}.`,
+    a: `Oui. Exportez une copie sur le premier appareil et restaurez-la sur le second : devis, clients et fiches émetteurs sont fusionnés sans doublons. Deux précisions : chaque appareil conserve son propre compteur d'exports (le quota ne se transfère pas en bonus), et la licence est liée à l'appareil qui l'a activée — pour la déplacer, prévenez le vendeur au ${VENDOR.PHONE}.`,
   },
   {
     q: 'Comment fonctionne le parrainage ?',

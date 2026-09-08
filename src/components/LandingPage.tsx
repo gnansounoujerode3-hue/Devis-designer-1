@@ -184,14 +184,14 @@ export default function LandingPage() {
     { i: 'grid', t: `${TEMPLATES.length} modèles mis en page`, d: 'Chaque modèle est une mise en page complète (en-tête, tableau, totaux, conditions), pas un simple habillage. La couleur d’accent et la police se changent à tout moment.' },
     { i: 'pen', t: 'Signature en ligne', d: 'Le client signe avec le doigt ou la souris sur le document, ou vous joignez l’image de votre cachet. La date de signature est inscrite sur le PDF.' },
     { i: 'export', t: 'PDF A4, SVG ou présentation', d: "Export PDF multi-pages prêt à envoyer, SVG vectoriel à confier à l'imprimeur, ou présentation plein écran du devis chez le client." },
-    { i: 'users', t: 'Fichier clients', d: 'Les coordonnées d’un client sont réutilisées d’un document à l’autre : plus rien à retaper pour une relance ou une facture.' },
+    { i: 'users', t: 'Vos fiches enregistrées', d: 'Votre en-tête et les coordonnées de vos clients reviennent d’un document à l’autre : plus rien à retaper pour une relance ou une facture.' },
     { i: 'percent', t: 'TVA et multi-devises', d: 'Taux de taxe paramétrable, conditions et notes libres imprimées sous le tableau, montants en franc CFA, en euros ou en dollars.' },
     { i: 'device', t: 'Sauvegarde sur l’appareil', d: 'Tout ce que vous saisissez est enregistré dans le navigateur — automatiquement, toutes les quelques secondes — et vous pouvez exporter une copie JSON à réimporter plus tard sur un autre appareil.' },
     { i: 'cursor', t: 'Édition directe sur le document', d: "Activez l'édition directe et tapez directement sur l'aperçu : chaque texte du devis est modifiable là où il se lit, sans chercher le bon champ dans le panneau." },
   ];
 
   const steps: Array<{ n: string; t: string; d: string }> = [
-    { n: '1', t: 'Renseignez votre entreprise', d: "Nom, activité, coordonnées, logo : l'en-tête de votre devis. Pour le document suivant, dupliquez le précédent — vous ne le retapez pas." },
+    { n: '1', t: 'Renseignez votre entreprise', d: "Nom, activité, coordonnées, logo : l'en-tête de votre devis. Touchez « + SAUVEGARDER CETTE FICHE » : le document suivant part déjà rempli." },
     { n: '2', t: 'Ajoutez vos lignes', d: 'Prestations, quantités, prix unitaires. La TVA, le total et l’acompte se calculent pendant que vous tapez.' },
     { n: '3', t: 'Choisissez le modèle', d: 'Comparez les 12 mises en page sur votre propre contenu, ajustez la couleur et la police.' },
     { n: '4', t: 'Exportez, faites signer', d: "PDF à envoyer, fichier de signature pour le client, puis conversion en facture une fois l'accord reçu." },
