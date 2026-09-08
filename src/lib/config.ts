@@ -23,7 +23,7 @@ export const VENDOR = {
    * WhatsApp et dans les liens de parrainage (referralDownloadLink() y ajoute
    * ?ref=VOTRE_CODE). À changer si vous déménagez le site.
    */
-  DOWNLOAD_LINK: 'https://devis-designer-app.gnansounoujerode3.workers.dev/',
+  DOWNLOAD_LINK: 'https://devis-designer-app.jerode.workers.dev/',
 };
 
 /**

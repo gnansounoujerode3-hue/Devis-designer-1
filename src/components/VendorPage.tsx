@@ -16,7 +16,7 @@ import { fetchWorkerReferralStats, isWorkerReferralEnabled, type WorkerReferralS
 /* ============================================================
    ESPACE VENDEUR — page réservée au propriétaire de l'app
    ------------------------------------------------------------
-   Accès : https://devis-designer-app.gnansounoujerode3.workers.dev/#/vendeur
+   Accès : https://devis-designer-app.jerode.workers.dev/#/vendeur
    (aucune liaison visible dans l'application)
    Protégé par le PIN VENDOR_PIN (src/lib/config.ts).
    ------------------------------------------------------------

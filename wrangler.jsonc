@@ -4,7 +4,7 @@
   // « assets statiques » : AUCUN code ici, Cloudflare sert dist/.
   // Déploiement :  npm run build && npx wrangler deploy
   // (ou `npm run deploy:cf`, qui enchaîne les deux)
-  // URL obtenue :  https://devis-designer-app.gnansounoujerode3.workers.dev
+  // URL obtenue :  https://devis-designer-app.jerode.workers.dev
   //
   // L'API de l'application (quota d'exports, caisse Chariow, parrainage,
   // espace vendeur) reste le Worker séparé `devisdesigner`, déclaré dans

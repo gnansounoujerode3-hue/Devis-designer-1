@@ -29,8 +29,8 @@
   };
   globalThis.window = globalThis;
   globalThis.location = {
-    href: 'https://devis-designer-app.gnansounoujerode3.workers.dev/', search: '', hash: '',
-    origin: 'https://devis-designer-app.gnansounoujerode3.workers.dev', assign() {}, replace() {},
+    href: 'https://devis-designer-app.jerode.workers.dev/', search: '', hash: '',
+    origin: 'https://devis-designer-app.jerode.workers.dev', assign() {}, replace() {},
   };
   const nav = { language: 'fr-FR', userAgent: 'node' };
   try { Object.defineProperty(globalThis, 'navigator', { value: nav, configurable: true, writable: true }); }

@@ -206,7 +206,7 @@ def main() -> int:
     ap.add_argument("--title", default="Vos devis et factures, mis en page comme un studio.")
     ap.add_argument("--sub", default="12 modèles, signature du client, export PDF vectoriel.")
     ap.add_argument("--chips", default="20 exports offerts|XOF · EUR · USD|Mobile Money")
-    ap.add_argument("--url", default="devis-designer-app.gnansounoujerode3.workers.dev")
+    ap.add_argument("--url", default="devis-designer-app.jerode.workers.dev")
     ap.add_argument("--note", default="Aucune installation, aucun compte.",
                     help="ligne discrète sous le domaine ; '' pour l'omettre")
     a = ap.parse_args()
@@ -292,14 +292,23 @@ def main() -> int:
         x += chip(d, ty, x, SLOT_CHIPS, label, size) + 12
 
     # pied : domaine en pastille + note, sur la même ligne.
-    # Un sous-domaine peut être long (devis-designer-app.<compte>.workers.dev) : on réduit
-    # le corps de la pastille jusqu'à ce qu'elle tienne dans la colonne, on réduit la note,
-    # et si les deux ne tiennent toujours pas, c'est la NOTE qui saute — jamais l'adresse.
-    # Une adresse tronquée serait un mensonge sur le seul truc que le visiteur doit retenir.
+    # Un sous-domaine peut être long (devis-designer-app.<compte>.workers.dev) : on réduit le
+    # corps de la pastille jusqu'à ce qu'elle tienne dans la colonne, on réduit la note, et si les
+    # deux ne tiennent pas, la note descend sous la pastille et l'adresse reprend sa taille
+    # maximale. Règle : une adresse tronquée serait un mensonge sur le seul truc à retenir ; une
+    # phrase discrète qui descend d'une ligne, non.
     note = a.note
-    u_size = 27
-    while u_size > 18 and col_x + ty.width(d, a.url, u_size, True) + 44 + (20 + ty.width(d, note, 20) if note else 0) > col_x + col_w:
-        u_size -= 1
+
+    def url_size(reserve: int) -> int:
+        # Plancher à 12 : en dessous, mieux vaudrait couper l'adresse, et on a décidé de ne
+        # jamais la couper. Un hôte si long ne devrait pas arriver — la vignette devient juste
+        # modeste, elle ne passe plus sous le document simulé.
+        z = 27
+        while z > 12 and ty.width(d, a.url, z, True) + 44 + reserve > col_w:
+            z -= 1
+        return z
+
+    u_size = url_size(20 + (ty.width(d, note, 20) if note else 0))
     uw = ty.width(d, a.url, u_size, True)
     note_size = 24
     note_x = col_x + uw + 64
@@ -307,13 +316,13 @@ def main() -> int:
         note_size -= 1   # la note ne passe jamais sous le document
     below = bool(note) and note_x + ty.width(d, note, note_size) > col_x + col_w
     if below:
-        # Plus de place à droite de la pastille : la note passe dessous (petit corps),
-        # elle ne disparaît pas, et l'adresse garde toute sa largeur.
+        u_size = url_size(0)                      # la ligne est libre : l'adresse grandit
+        uw = ty.width(d, a.url, u_size, True)
         note_size = 16
-        while note_size > 11 and col_x + ty.width(d, note, note_size) > col_w:
+        while note_size > 11 and ty.width(d, note, note_size) > col_w:
             note_size -= 1
-        if col_x + ty.width(d, note, note_size) > col_w or SLOT_FOOT + 60 + note_size > H - 8:
-            note = ""        # vraiment trop étroit : on renonce à la note, jamais à l'adresse
+        if ty.width(d, note, note_size) > col_w or SLOT_FOOT + 60 + note_size > H - 8:
+            note = ""                             # vraiment trop étroit : on renonce à la note
     rrect(d, (col_x, SLOT_FOOT, col_x + uw + 44, SLOT_FOOT + 48), 24, fill=ACCENT)
     ty.text(d, (col_x + 22, SLOT_FOOT + (48 - u_size) // 2 - 2), a.url, u_size, (255, 255, 255), bold=True)
     if note:

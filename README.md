@@ -18,7 +18,7 @@ npm run preview    # prévisualiser le build
 
 - **Application web, sans installation — mais avec connexion** : un seul fichier `dist/index.html`,
   servi par **Cloudflare Workers** en fichiers statiques — l'adresse publique est la constante
-  `VENDOR.DOWNLOAD_LINK` (`https://devis-designer-app.gnansounoujerode3.workers.dev/`, voir « Option 5 ») ; l'adresse historique sur Netlify
+  `VENDOR.DOWNLOAD_LINK` (`https://devis-designer-app.jerode.workers.dev/`, voir « Option 5 ») ; l'adresse historique sur Netlify
   reste en ligne le temps que chacun fasse la bascule, puisque c'est le nom de domaine qui garde les documents
   d'un utilisateur. Pas de mode hors-ligne : sans réseau, la page ne se charge pas ; en revanche les
   documents sont enregistrés sur l'appareil au fil de l'eau ; ajoutable à l'écran d'accueil du téléphone
@@ -161,7 +161,7 @@ puis verdir.
 Un lien partagé n'affiche **aucun visuel** si la page ne déclare pas d'`og:image`.
 Trois règles, vérifiées par `npm run test:ui` :
 
-- l'URL est **absolue** (`https://devis-designer-app.gnansounoujerode3.workers.dev/og-image.png`) et sur le même
+- l'URL est **absolue** (`https://devis-designer-app.jerode.workers.dev/og-image.png`) et sur le même
   domaine que `og:url` ;
 - le fichier est un **PNG raster** de **1200×630** (pas de SVG : les robots d'aperçu ne le
   lisent pas), sous 400 ko, et vit dans `public/` pour que Vite le recopie dans `dist/` ;
@@ -179,10 +179,14 @@ python3 scripts/make-og-image.py --title "…" --sub "…" --chips "a|b|c" --url
 Le visuel est **dessiné par le script** (aucune capture d'écran) : le texte et la
 mise en page de la vignette se règlent donc comme du code, et le faux document de droite
 suit les proportions A4 réelles (794×1123). `index.html` porte les balises ; le script
-accepte `--size`, `--logo`, `--note` (et `--note ""` pour retirer la ligne discrète).
+accepte `--size`, `--logo`, `--note` (et `--note ""` pour retirer la ligne discrète). Le pied de
+la vignette s'adapte tout seul : la pastille d'adresse garde sa taille tant qu'elle tient dans la
+colonne, la note se réduit, puis descend sous la pastille si la ligne est pleine — **l'adresse n'est
+jamais tronquée**, c'est le seul truc que le visiteur doit retenir. Un sous-domaine de compte à
+répéter (58 caractères) a été testé : la vignette reste lisible.
 
 > **Après déploiement**, si WhatsApp affiche toujours l'ancien aperçu : il **met la vignette
-> en cache**. Renvoyez le lien avec un paramètre différent (`https://devis-designer-app.gnansounoujerode3.workers.dev/?v=2`)
+> en cache**. Renvoyez le lien avec un paramètre différent (`https://devis-designer-app.jerode.workers.dev/?v=2`)
 > pour le forcer à re-scroller la page, ou attendez quelques heures.
 
 ## Page d'accueil publique (landing)
@@ -386,7 +390,7 @@ Page **réservée au vendeur** (vous), **invisible des utilisateurs** : aucune
 liaison dans l'application, accès uniquement via l'URL :
 
 ```
-https://devis-designer-app.gnansounoujerode3.workers.dev/#/vendeur
+https://devis-designer-app.jerode.workers.dev/#/vendeur
 ```
 
 1. Saisissez le **PIN** (`VENDOR_PIN` dans `src/lib/config.ts` — par défaut `2468`, **à changer**).
@@ -452,7 +456,7 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 248 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 250 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
@@ -483,7 +487,7 @@ pour votre quota de 20 exports par appareil.
 npm install
 npx wrangler login          # ouvre le navigateur ; compte Cloudflare gratuit, sans carte
 npm run build               # -> dist/index.html (fichier unique, ~1,4 Mo) + og-image.png
-npx wrangler deploy         # -> https://devis-designer-app.gnansounoujerode3.workers.dev
+npx wrangler deploy         # -> https://devis-designer-app.jerode.workers.dev
 ```
 `npm run deploy:cf` enchaîne les deux dernières lignes. Sur une machine sans navigateur
 (session distante), remplacez `wrangler login` par un jeton : tableau de bord → *My Profile →
@@ -518,6 +522,44 @@ l'affiche.
    domains → Add*, et Cloudflare signe le HTTPS tout seul. Le nom `*.workers.dev` reste atteignable.
    Testez-le d'abord depuis un réseau mobile local (MTN puis Orange) : les sous-domaines partagés
    sont parfois filtrés selon les opérateurs — un domaine à vous règle la question.
+
+#### Le milieu de l'URL n'est pas un réglage de l'app : c'est votre sous-domaine de compte
+
+`devis-designer-app.jerode.workers.dev` se lit ainsi : `<nom du Worker>.<sous-domaine du compte
+Cloudflare>.workers.dev`. Le premier morceau vient de `wrangler.jsonc` (`"name"`), le second est
+**unique à votre compte** et se change dans *Workers & Pages → Settings → Subdomains*
+(**Sites & Workers subdomain**). Deux conséquences à ne pas rater :
+
+1. **Le renommage déplace aussi l'API.** Votre Worker de quota s'appelle `devisdesigner`, il vit sur
+   le même sous-domaine : le jour où vous passez de `gnansounoujerode3` à `jerode`, son adresse
+   change en même temps. Il faut donc, **le jour même**, corriger `AUTO_PAY_WORKER_URL` et
+   redéployer le front, sinon plus personne ne peut payer ni vérifier son quota :
+   ```bash
+   ANCIEN=gnansounoujerode3        # le sous-domaine de compte d'avant
+   NOUVEAU=jerode                 # celui que vous venez de choisir
+   OLD=devisdesigner.$ANCIEN.workers.dev
+   NEW=devisdesigner.$NOUVEAU.workers.dev
+   sed -i "s|$OLD|$NEW|g" src/lib/config.ts README.md
+   npm test && npm run deploy:cf
+   # et redéployez le Worker d'API comme d'habitude : bouton *Deploy* dans l'éditeur
+   # du Worker, ou `npx wrangler deploy` depuis le dossier qui contient son wrangler.toml
+   ```
+   (Adaptez la dernière ligne à la façon dont vous déployez le Worker d'API ; le KV suit le Worker,
+   pas l'URL : aucun compteur n'est perdu.) Pensez aussi à l'URL du **webhook Chariow**, enregistrée
+   dans votre espace marchand sur l'ancienne adresse — c'est le seul élément que ce dépôt ne peut pas
+   corriger pour vous.
+2. **Un sous-domaine, ça ne se préserve pas.** Une fois renommé, l'ancienne adresse ne répond plus :
+   ni redirection, ni cohabitation. Tous les liens déjà partagés (parrainages envoyés par WhatsApp,
+   captures d'écran, liens dans une conversation) deviennent morts. Le renommage se fait donc à un
+   moment calme — ou, mieux, il devient inutile : une fois un **domaine à vous** branché sur le
+   Worker, plus rien ne dépend du sous-domaine de compte.
+
+Le nom doit aussi être **libre chez Cloudflare** (il est unique mondialement) : si le tableau de
+bord refuse `jerode`, prenez-en un autre (`jerode-app`, `devisdesigner`, …) et refaites le
+remplace-partout ci-dessus dans les six fichiers qui portent l'adresse du front (`index.html`,
+`src/lib/config.ts`, `src/components/VendorPage.tsx`, `tests/shim.js`, `tests/landing_test.tsx`,
+`scripts/make-og-image.py`) puis régénérez la vignette (`python3 scripts/make-og-image.py`).
+`npm test` rougit si un seul de ces fichiers reste sur l'adresse d'avant : c'est voulu.
 
 **Variante Pages (build Git automatique)** — *Workers & Pages → Create → Pages → Connect to Git* :
 build command `npm run build`, build output directory `dist`, variable d'environnement
@@ -640,7 +682,7 @@ un filigrane « Version d'essai » sur les PDF gratuits.
 ## 🔗 Lien public & lien de parrainage
 
 Tout part d'une seule constante, `VENDOR.DOWNLOAD_LINK` dans `src/lib/config.ts`
-(aujourd'hui `https://devis-designer-app.gnansounoujerode3.workers.dev/`) :
+(aujourd'hui `https://devis-designer-app.jerode.workers.dev/`) :
 
 - les boutons « Parrainer un ami sur WhatsApp » partagent **`…/?ref=DDREF-VOTRECODE`** ;
 - à l'arrivée, `App.tsx` lit `?ref=`, enregistre le code parrain du filleul et enlève

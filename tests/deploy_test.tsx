@@ -48,12 +48,19 @@ const appHost = appUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 ok(/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(\/|$)/.test(appUrl), 'VENDOR.DOWNLOAD_LINK est une URL absolue', appUrl);
 ok(!appUrl.includes('workers.dev') || appHost !== apiHost, 'le domaine du front n’est pas celui de l’API');
 
-/** Tous les hôtes « devisdesigner…` d'un fichier doivent être le domaine public ou celui de l'API. */
+/**
+ * Tous les hôtes de l'application (et de son API) mentionnés dans un fichier doivent être
+ * l'adresse publique courante ou celle du Worker d'API. Un hôte de partage WhatsApp périmé,
+ * un lien de parrainage qui pointe encore chez l'ancien hébergeur : c'est exactement ce que
+ * cette règle attrape. Les modèles d'hébergeurs connus sont les seuls reconnus, et une
+ * variable shell (`devisdesigner.$NOUVEAU.workers.dev`) n'est pas un hôte — elle ne doit pas
+ * faire rougir le test, sinon la procédure de renommage serait indésirable.
+ */
 function staleHosts(f: string): string[] {
-  const hosts = read(f).match(/(?:https?:\/\/)?[a-z0-9._-]*devisdesigner[a-z0-9._-]*/gi) || [];
-  const wanted = new Set([appHost, apiHost, apiHost.replace(/\.[^.]+\.[^.]+$/, ''), 'devisdesigner']);
-  return Array.from(new Set(hosts.map(h => h.replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase())))
-    .filter(h => !wanted.has(h));
+  const hosts = read(f).match(/(?:[a-z0-9-]+\.)+(?:workers\.dev|netlify\.app|pages\.dev|vercel\.app)/gi) || [];
+  const wanted = new Set([appHost.toLowerCase(), apiHost.toLowerCase(), 'devisdesigner']);
+  return Array.from(new Set(hosts.map(h => h.toLowerCase())))
+    .filter(h => h.includes('devisdesigner') && !wanted.has(h));
 }
 for (const f of ['index.html', 'src/lib/config.ts', 'src/components/VendorPage.tsx', 'tests/shim.js',
                 'scripts/make-og-image.py', 'tests/landing_test.tsx', 'README.md']) {
@@ -93,6 +100,12 @@ const pkgVersion = JSON.parse(read('package.json')).version;
 ok(appVersion === pkgVersion, 'package.json et config.ts portent la même version', `${pkgVersion} / ${appVersion}`);
 ok(readme.includes(`Version ${appVersion}`), 'README : la sonde de version annonce la version courante', appVersion);
 ok(/tests\/deploy_test\.tsx/.test(readme), 'README : cette suite est listée avec les autres');
+// L'adresse annoncée dans wrangler.jsonc et dans config.ts ne doivent pas pouvoir diverger :
+// c'est exactement ce qui casse un partage WhatsApp ou un lien de parrainage après un renommage.
+const advertised = (read('wrangler.jsonc').match(/https:\/\/([a-z0-9.-]+\.workers\.dev)/i) || [])[1] || '';
+ok(advertised === appHost, 'wrangler.jsonc et config.ts annoncent la même adresse publique', `${advertised} / ${appHost}`);
+ok(/Subdomains|sous-domaine/i.test(readme) && /webhook Chariow/.test(readme),
+  'README : le sous-domaine de compte et le webhook Chariow sont signalés au moment du renommage');
 ok(/Version 1\.3\.[0-9]/.test(readme) === false || readme.includes('Version ' + appVersion), 'README : aucun numéro de version périmé ne traîne');
 
 
