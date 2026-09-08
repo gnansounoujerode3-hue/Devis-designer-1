@@ -9,10 +9,21 @@ mises à jour automatiques. Le site présente deux vues : une **page d'accueil p
 
 ```bash
 npm install        # installer les dépendances
-npm run dev        # serveur de développement (http://localhost:5173)
+npm test           # 8 suites, 508 assertions, tout ce qui casse en silence
 npm run build      # build de production (fichier unique dist/index.html)
-npm run preview    # prévisualiser le build
+npm run preview    # prévisualiser le build (localhost seulement)
+npm run dev        # serveur de développement (http://localhost:5173)
 ```
+
+`npm audit` doit répondre **0 vulnérabilité**. Ce n'était pas le cas avant 1.3.7 : `vite 7.3.2` et
+`esbuild 0.27.x` traînaient deux trous qui ne s'ouvrent **que sous Windows et que sur le serveur de
+développement** — `vite dev` exposait `launch-editor` à une fuite de hash NTLMv2 par chemin UNC, et
+`server.fs.deny` se contournait par les chemins alternatifs de Windows (lecture de fichiers hors du
+dossier du projet, et `esbuild` en faisait autant). Rien de tout cela n'entre dans `dist/index.html` :
+un fichier livré à un client n'est pas concerné, c'est la machine qui développe qui l'était. Les
+dépendances sont donc épinglées à `vite 7.3.6` et `esbuild ^0.28.2`, et `tests/deploy_test.tsx` refuse
+désormais une version plus ancienne — une remontée de pin ne se perdra pas. Ne jouez pas
+`npm audit fix --force` : il casse les pins et réécrit le lock pour des versions que rien n'a validées.
 
 ## Fonctionnalités
 
@@ -292,7 +303,7 @@ devis-designer/
 │   ├── design_test.tsx # Tout le trajet du design personnalisé (67 assertions)
 │   ├── pulse_test.tsx  # La sonde du Pulse Chariow, état par état (59 assertions)
 │   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (69 assertions)
-│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne (55 assertions)
+│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne, y compris les commandes et les pins (62 assertions)
 │   ├── payment_test.tsx # Le Worker rejoué sous Node : annulation, code unique, Pulse (45 assertions)
 │   ├── services_test.tsx # Le carnet de prestations et les astérisques du paiement (65 assertions)
 │   ├── emitter_test.tsx # Le carnet d'émetteurs, la numérotation et le callback (61 assertions)
@@ -599,11 +610,17 @@ généré (exportez régulièrement en CSV).
 Le build produit **un seul fichier** `dist/index.html` (tout inliné : JS, CSS, logo, favicon).
 Il peut être hébergé **n'importe où** :
 
-### Option 1 — Vercel (gratuit)
+### Option 1 — Vercel (gratuit) — l'adresse historique, à ne pas supprimer pendant la transition
 ```bash
-npm run deploy
+npm run deploy:vercel
 ```
-Ou via le tableau de bord vercel.com : importez le dépôt, framework = Vite, build = `npm run build`, output = `dist`.
+Ou via le tableau de bord vercel.com : importez le dépôt, framework = Vercel, build = `npm run build`, output = `dist`.
+
+C'est **le mauvais bouton pour publier aujourd'hui** : le domaine que les liens de parrainage, les CGU et la
+FAQ citent est l'option 5 (un Worker d'assets Cloudflare). Le piège était dans `package.json` — le script
+nu `deploy` y pointait, si bien que la commande évidente publiait chez Vercel. Depuis 1.3.7, `deploy` et
+`deploy:cf` font la même chose (l'option 5) et Vercel s'appelle `deploy:vercel`. Vercel reste utile comme
+**miroir** : une URL qui ne bouge jamais sous la main, et un repli si Cloudflare tombe.
 
 ### Option 2 — Netlify (gratuit) — l'adresse historique, à ne pas supprimer pendant la transition
 Le dépôt ne contient **que les sources** (`dist/` n'est pas versionné) : il faut donc
@@ -627,14 +644,14 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.6` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.7` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse + annulation détectée dans /check)` |
 | Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 501 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 508 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
@@ -667,9 +684,19 @@ npx wrangler login          # ouvre le navigateur ; compte Cloudflare gratuit, s
 npm run build               # -> dist/index.html (fichier unique, ~1,4 Mo) + og-image.png
 npx wrangler deploy         # -> https://devis-designer-app.jerode.workers.dev
 ```
-`npm run deploy:cf` enchaîne les deux dernières lignes. Sur une machine sans navigateur
-(session distante), remplacez `wrangler login` par un jeton : tableau de bord → *My Profile →
-API tokens → Create*, modèle **Edit Cloudflare Workers**, puis `export CLOUDFLARE_API_TOKEN=…`.
+Les trois scripts de publication, pour qu'il n'y ait pas de surprise sur celui que le nom promet :
+
+| Commande | Ce qu'elle fait |
+|---|---|
+| `npm run deploy` | `vite build` puis `npx wrangler deploy` — **le domaine public** (c'est celle qu'on doit taper) |
+| `npm run deploy:cf` | strictement la même chose, gardée parce qu'elle est citée dans `wrangler.jsonc` et dans les tests |
+| `npm run deploy:vercel` | `vite build` puis `npx vercel --prod` — l'adresse historique (option 1) |
+
+Sur une machine sans navigateur (session distante), remplacez `wrangler login` par un jeton : tableau de
+bord → *My Profile → API tokens → Create*, modèle **Edit Cloudflare Workers**. Sous bash :
+`export CLOUDFLARE_API_TOKEN=…` ; sous **PowerShell** : `$env:CLOUDFLARE_API_TOKEN = "cfc7…"` (valable
+pour la session courante — les variables d'environnement du registre sont lues par `wrangler` sans
+réouverture de fenêtre s'il n'y a que `PATH` de changé, sinon relancez PowerShell).
 Avec un seul compte, `wrangler` trouve l'identifiant tout seul ; sinon `npx wrangler whoami`
 l'affiche.
 
@@ -720,8 +747,10 @@ Cloudflare>.workers.dev`. Le premier morceau vient de `wrangler.jsonc` (`"name"`
    NOUVEAU=jerode                 # celui que vous venez de choisir
    OLD=devisdesigner.$ANCIEN.workers.dev
    NEW=devisdesigner.$NOUVEAU.workers.dev
-   sed -i "s|$OLD|$NEW|g" src/lib/config.ts README.md
-   npm test && npm run deploy:cf
+   sed -i "s|$OLD|$NEW|g" src/lib/config.ts README.md      # bash
+   # PowerShell, sans regex (les points de l'URL ne mangent pas le motif) :
+   foreach ($f in 'src/lib/config.ts','README.md') { (Get-Content $f -Raw).Replace($OLD,$NEW) | Set-Content $f -NoNewline -Encoding utf8 }
+   npm test && npm run deploy
    # et redéployez le Worker d'API comme d'habitude : bouton *Deploy* dans l'éditeur
    # du Worker, ou `npx wrangler deploy` depuis le dossier qui contient son wrangler.toml
    ```

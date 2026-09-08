@@ -97,12 +97,35 @@ ok(ld.includes(`"url": "https://${appHost}/"`), 'index.html : le JSON-LD (Softwa
 const pkg = JSON.parse(read('package.json'));
 ok(/wrangler deploy/.test(pkg.scripts['deploy:cf'] || ''), 'package.json : npm run deploy:cf déploie sur Cloudflare', pkg.scripts['deploy:cf']);
 ok(/vite build/.test(pkg.scripts['deploy:cf'] || ''), 'deploy:cf construit d’abord dist (le Worker n’envoie que ça)');
+// Le piège qui a mordu : `npm run deploy` tout court envoyait le front chez Vercel, l'hôte
+// historique, alors que le domaine public est un Worker d'assets. La commande évidente doit
+// être la bonne ; l'ancienne voie reste disponible, mais nommée.
+ok(/wrangler deploy/.test(pkg.scripts['deploy'] || ''), 'package.json : npm run deploy = Cloudflare, le domaine public', pkg.scripts['deploy']);
+ok(/vercel --prod/.test(pkg.scripts['deploy:vercel'] || ''), 'package.json : la voie Vercel existe sous son nom explicite', pkg.scripts['deploy:vercel']);
+ok(!/vercel/.test(pkg.scripts['deploy'] || ''), 'package.json : plus aucun script « deploy » nu ne pointe ailleurs que sur le domaine public');
+// vite 7.3.2 et esbuild 0.27.x avaient deux trous réservées au serveur de développement sous
+// Windows (lecture de n'importe quel fichier, contournement de server.fs.deny, hash NTLMv2 par
+// chemin UNC). Rien de tout cela n'entre dans dist/index.html, mais la machine qui développe, si.
+const verNum = (raw: string) => (raw || '').replace(/[^0-9.]/g, ' ').trim().split(/[.\s]+/).map(Number);
+const atLeast = (raw: string, min: number[]) => {
+  const v = verNum(raw);
+  for (let i = 0; i < min.length; i++) {
+    const a = v[i] || 0;
+    if (a > min[i]) return true;
+    if (a < min[i]) return false;
+  }
+  return true;
+};
+ok(atLeast(pkg.devDependencies?.vite, [7, 3, 6]), 'package.json : vite à la version qui ferme les trous Windows du serveur de dev', pkg.devDependencies?.vite);
+ok(atLeast(pkg.devDependencies?.esbuild, [0, 28, 2]), 'package.json : esbuild idem', pkg.devDependencies?.esbuild);
 ok(/deploy_test\.tsx/.test(pkg.scripts['test:ui'] || ''), 'npm run test:ui joue cette suite', pkg.scripts['test:ui']);
 ok(read('wrangler.jsonc').includes('npm run deploy:cf'), 'wrangler.jsonc rappelle la commande');
 
 /* ---------- 4. Le README dit la vérité sur l'option Cloudflare ---------- */
 const readme = read('README.md');
 ok(/### Option 5 — Cloudflare/.test(readme), 'README : l’option Cloudflare est écrite à côté des quatre autres');
+ok(readme.includes('npm run deploy:vercel'), 'README : l’ancienne voie est montrée sous le nom de script qui la désigne');
+ok(/server\.fs\.deny/.test(readme) && /Windows/.test(readme), 'README : les deux trous Windows du serveur de dev sont écrits avec leur correctif');
 for (const s of ['npx wrangler login', 'npx wrangler deploy', 'not_found_handling', 'pages deploy', 'wrangler rollback']) {
   ok(readme.includes(s), `README : ${s}`);
 }
