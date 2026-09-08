@@ -139,13 +139,14 @@ Restauration énonce le nombre de fiches, pour que personne ne croie avoir perdu
 npm run test:ui          # ou : npm test
 ```
 
-Trois suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
+Quatre suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
 le TSX avec un shim DOM minimal — `tests/shim.js` — et laisse `react`/`react-dom` imports de
 `node_modules`, donc le harness rend avec le même React que l'app) :
 
 | Suite | Ce qu'elle tient |
 | --- | --- |
 | `tests/emitter_test.tsx` | La fiche de l'émetteur : pré-remplissage de tout nouveau document par la fiche par défaut (et victoire d'un en-tête explicite), mise à jour sur place au lieu d'un doublon, choix et report de la fiche par défaut, carnet vidé, repli de quota logo (`{ saved, withLogo }`) jusqu'à l'échec total, sauvegarde JSON `version: 3` (remplacement à l'identique, fusion dédupliquée, copie ancienne qui ne vide rien), et les textes réellement écrits à l'écran, dans la FAQ, sur la landing et dans ce README. |
+| `tests/deploy_test.tsx` | L'hébergement : `wrangler.jsonc` est un Worker d'assets valide (dist, fallback SPA, aucun script, nom distinct de celui du Worker d'API) ; **un seul domaine public** dans `index.html`, `config.ts`, la landing, la page vendeur, le shim de test, la vignette et ce README ; les commandes annoncées (`deploy:cf`) existent ; le README dit la vérité sur Cloudflare et sur le déménagement d'origine (`localStorage`). |
 | `tests/design_test.tsx` | Tout le trajet du design sur mesure : pack du vendeur → fichier signé → refus des fichiers modifiés, tronqués, trop gros → import → **rendu par le vrai `QuoteSVG`** → emplacements 1 à 6 (ajout, remplacement, plafond, retrait) → sauvegarde JSON et restauration (avec blob falsifié) → code d'activation `DESIGN` → carte d'import dans les deux états. Les gabarits testés sont dans `tests/fixtures/`. |
 | `tests/landing_test.tsx` | La page d'accueil se rend ; ses chiffres viennent des constantes (`PRICE_*`, `FREE_EXPORT_LIMIT`, `TEMPLATES.length`) et non de nombres recopiés ; aucune promesse interdite (mode hors-ligne, téléchargement, témoignages et étoiles inventés, ancien forfait de 3 mois, avoir) ; aucun emoji ; chaque mention du réseau dit la vérité ; la vignette de partage existe, fait 1200×630 et est déclarée sur le bon domaine. |
 
@@ -415,7 +416,7 @@ généré (exportez régulièrement en CSV).
 Le build produit **un seul fichier** `dist/index.html` (tout inliné : JS, CSS, logo, favicon).
 Il peut être hébergé **n'importe où** :
 
-### Option 1 — Vercel (recommandé, gratuit)
+### Option 1 — Vercel (gratuit)
 ```bash
 npm run deploy
 ```
@@ -441,14 +442,15 @@ Si le CLI demande sur quel site pousser : `npx netlify-cli link` → choisissez 
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.2.0` |
+| Le front (Netlify) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.0` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-07 (quota + parrainage serveur + DESIGN = design + 1 mois d'exports)` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 114 assertions
-vertes avant de pousser, dont les textes de la page d'accueil, des CGU et du `index.html`.
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 247 assertions
+vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
+cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
 ### Option 3 — Hébergement classique (OVH, Hostinger, etc.)
 - Téléversez `dist/index.html` (et le dossier `dist/` entier) sur votre espace web
@@ -459,6 +461,85 @@ vertes avant de pousser, dont les textes de la page d'accueil, des CGU et du `in
 npm run build
 npx gh-pages -d dist
 ```
+
+### Option 5 — Cloudflare Workers (assets statiques) — le choix cohérent ici
+
+Votre API (quota, caisse Chariow, parrainage, espace vendeur) **vit déjà chez Cloudflare** : y
+loger aussi le front supprime un fournisseur, et le CORS n'a jamais été un sujet (`cors()` du Worker
+répond `Access-Control-Allow-Origin: *`, donc n'importe quelle origine peut l'appeler). En 2026,
+Pages reste utilisable mais n'évolue plus — tout est investi dans Workers, qui sait désormais
+servir des fichiers statiques **sans une ligne de code**. `wrangler.jsonc`, à la racine du dépôt,
+fait exactement cela : `"assets": { "directory": "./dist", "not_found_handling":
+"single-page-application" }`. Une requête servie par un fichier n'invoque aucun script, donc elle
+n'est pas comptée ; le plan gratuit du Worker d'API (100 000 invocations/jour) reste dimensionné
+pour votre quota de 20 exports par appareil.
+
+**Publier (≈ 2 minutes, la première fois 5)**
+```bash
+npm install
+npx wrangler login          # ouvre le navigateur ; compte Cloudflare gratuit, sans carte
+npm run build               # -> dist/index.html (fichier unique, ~1,4 Mo) + og-image.png
+npx wrangler deploy         # -> https://devis-designer-app.gnansounoujerode3.workers.dev
+```
+`npm run deploy:cf` enchaîne les deux dernières lignes. Sur une machine sans navigateur
+(session distante), remplacez `wrangler login` par un jeton : tableau de bord → *My Profile →
+API tokens → Create*, modèle **Edit Cloudflare Workers**, puis `export CLOUDFLARE_API_TOKEN=…`.
+Avec un seul compte, `wrangler` trouve l'identifiant tout seul ; sinon `npx wrangler whoami`
+l'affiche.
+
+**Ce que ce choix implique**
+1. Rien d'autre à configurer côté Cloudflare : pas de `_redirects`, pas de Functions. Le routage de
+   l'app est en **hash** (`#/app`, `#/vendeur`) ; le `not_found_handling` n'est qu'un filet.
+2. L'URL publique change, donc **elle doit être corrigée dans le dépôt** (et `npm test` le vérifie) :
+   `src/lib/config.ts` (`VENDOR.DOWNLOAD_LINK` : liens de parrainage, FAQ, CGU), `index.html`
+   (`og:url`, `og:image`, `twitter:image`, `canonical`, `url` du JSON-LD),
+   `scripts/make-og-image.py --url=<nouvel hôte>` **puis régénérer la vignette**
+   (`python3 scripts/make-og-image.py`, sinon l'aperçu WhatsApp pointe l'ancienne adresse),
+   `src/components/VendorPage.tsx` (le commentaire d'accès), `tests/shim.js`, `README.md`.
+3. Aucune retouche du Worker d'API, sauf si vous changez son nom : `AUTO_PAY_WORKER_URL` dans
+   `src/lib/config.ts` suffit, et l'adresse de retour de paiement est calculée sur
+   `window.location.origin`. Vérifiez en revanche dans l'espace Chariow qu'aucune URL de retour n'y
+   est enregistrée en dur avec l'ancien domaine.
+4. **Le point qui fâche : les données de vos utilisateurs.** Devis, clients, fiches émetteurs et
+   signatures vivent dans le `localStorage` de **l'origine exacte**. Publier sous une nouvelle URL,
+   c'est leur offrir un poste vide. Laissez donc l'ancienne adresse en ligne (ne pas supprimer le
+   site Netlify) et annoncez le geste : « Exporter une copie » sur l'ancienne adresse, puis
+   « Restaurer une copie » sur la nouvelle. Deux garde-fous jouent en votre faveur : le compteur
+   d'exports ne se remet **pas** à zéro (il est tenu par l'empreinte de l'appareil, clé `qfp:` du
+   Worker, et le serveur retient le maximum des compteurs), et le `BUILD_TAG` lu dans `#/vendeur`
+   permet de vérifier qui sert quelle version. Ce qui repart à zéro, en revanche : le code de
+   parrainage `DDREF-…` (localStorage lui aussi) et donc le compteur `refmonths:` associé —
+   surveillez les clés `refdev:` pendant la transition.
+5. Un domaine à vous (recommandé pour la clientèle) : *Workers & Pages → votre Worker → Custom
+   domains → Add*, et Cloudflare signe le HTTPS tout seul. Le nom `*.workers.dev` reste atteignable.
+   Testez-le d'abord depuis un réseau mobile local (MTN puis Orange) : les sous-domaines partagés
+   sont parfois filtrés selon les opérateurs — un domaine à vous règle la question.
+
+**Variante Pages (build Git automatique)** — *Workers & Pages → Create → Pages → Connect to Git* :
+build command `npm run build`, build output directory `dist`, variable d'environnement
+`NODE_VERSION=22`. Sans Git : `npx wrangler pages deploy dist --project-name=devisdesigner`.
+
+**Contrôles** — `npx wrangler deployments list` (historique), `npx wrangler rollback` (rendre la
+deployment précédente), `npx wrangler tail` (journaux du Worker d'API, si un jour vous mettez le
+front et l'API dans le même Worker).
+
+**Publier à chaque push (optionnel)** — `.github/workflows/deploy.yml` :
+```yaml
+name: Déployer sur Cloudflare
+on: { push: { branches: [main] } }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci && npm test && npm run build
+      - uses: cloudflare/wrangler-action@v3
+        with: { apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }} }
+```
+`npm test` avant `npm run build` : une suite rouge empêche la mise en ligne, et le job n'a aucun
+secret en dur — le jeton vit dans les *secrets* du dépôt sous `CLOUDFLARE_API_TOKEN`.
 
 ## 🔐 Sécurité
 

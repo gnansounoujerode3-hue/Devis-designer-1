@@ -10,8 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && npx vercel --prod",
+    "deploy:cf": "vite build && npx wrangler deploy",
     "design:pack": "esbuild scripts/design-pack.ts --bundle --platform=node --format=cjs --external:esbuild --outfile=node_modules/.dd/design-pack.cjs --log-level=warning && node node_modules/.dd/design-pack.cjs",
-    "test:ui": "node tests/run.mjs tests/design_test.tsx tests/landing_test.tsx tests/emitter_test.tsx",
+    "test:ui": "node tests/run.mjs tests/design_test.tsx tests/landing_test.tsx tests/emitter_test.tsx tests/deploy_test.tsx",
     "test": "npm run test:ui"
   },
   "dependencies": {

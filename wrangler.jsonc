@@ -1,0 +1,36 @@
+{
+  // ============================================================
+  // Frontend de Devis Designer, servi par Cloudflare Workers en
+  // « assets statiques » : AUCUN code ici, Cloudflare sert dist/.
+  // Déploiement :  npm run build && npx wrangler deploy
+  // (ou `npm run deploy:cf`, qui enchaîne les deux)
+  // URL obtenue :  https://devis-designer-app.gnansounoujerode3.workers.dev
+  //
+  // L'API de l'application (quota d'exports, caisse Chariow, parrainage,
+  // espace vendeur) reste le Worker séparé `devisdesigner`, déclaré dans
+  // src/lib/config.ts (AUTO_PAY_WORKER_URL). Les deux coexistent sans
+  // changement de leur côté : le Worker répond déjà
+  // `Access-Control-Allow-Origin: *`, et l'adresse de retour de paiement est
+  // construite sur `window.location.origin` du navigateur.
+  // ============================================================
+
+  // Nom du Worker, donc premier morceau de son adresse *.workers.dev.
+  // Il doit différer de `devisdesigner` (l'API) : deux Workers ne peuvent
+  // pas porter le même nom sur un même compte.
+  "name": "devis-designer-app",
+
+  // Figé à la date de création ; Cloudflare s'en sert pour choisir le
+  // comportement du runtime. À rajeunir lors d'une montée de wrangler.
+  "compatibility_date": "2026-09-08",
+
+  "assets": {
+    // Le dossier que produit `npm run build` (fichier unique + og-image.png).
+    "directory": "./dist",
+
+    // Routage de l'app en hash (#/app, #/vendeur) : ce n'est jamais le
+    // serveur qui choisit la page. Ce fallback sert uniquement à ne jamais
+    // afficher un 404 brut si un lien pointe vers un chemin inexistant.
+    // Tant qu'aucun script n'est invoqué, une requête n'est pas facturée.
+    "not_found_handling": "single-page-application"
+  }
+}
