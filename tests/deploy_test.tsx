@@ -59,7 +59,7 @@ for (const f of ['index.html', 'src/lib/config.ts', 'src/components/VendorPage.t
                 'scripts/make-og-image.py', 'tests/landing_test.tsx', 'README.md']) {
   ok(staleHosts(f).length === 0, `domaine cohérent dans ${f}`, staleHosts(f).join(', '));
 }
-ok(appHost === 'devisdesigner.netlify.app', 'le domaine public actuel est bien celui annoncé (Netlify)', appHost);
+ok(read('README.md').includes(appHost), 'README : le domaine public courant y est écrit (la sonde du pied de page le vérifie après déploiement)', appHost);
 const html = read('index.html');
 for (const m of ['og:url', 'og:image', 'twitter:image', 'canonical']) {
   const re = m === 'canonical'
