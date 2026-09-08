@@ -146,7 +146,10 @@ export async function createChariowPayment(amount: number, description: string):
         amount,
         currency: CHARIOW_API.CURRENCY,
         description,
-        callback_url: window.location.origin + '/#/paiement-confirme',
+        // Le routeur ne connaît que #/accueil, #/app et #/vendeur : « #/paiement-confirme »
+        // n'a jamais existé. On renvoie donc sur l'app, où la réouverture relit le Worker
+        // (`/check`) — c'est là que le code arrive, pas dans une page de remerciement.
+        callback_url: window.location.origin + '/#/app',
       }),
     });
     if (!res.ok) return null;

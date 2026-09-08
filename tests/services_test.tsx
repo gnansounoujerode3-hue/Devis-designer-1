@@ -153,7 +153,8 @@ ok(/>Nom<|>N° Mobile Money<|>Email</.test(form) || /Nom<\/b>|\bNom\b/.test(form
 /* ---------- 8. Ce qui est écrit autour (landing, FAQ, doc) ---------- */
 const landing = src('src/components/LandingPage.tsx');
 ok(!/Paiement Mobile Money en ligne/.test(landing), 'landing : la pastille retirée sur demande du propriétaire ne revient pas');
-ok(!/tone="green"/.test(landing), 'et sa couleur n’est plus utilisée nulle part sur la page');
+ok(!/tone="green"/.test(landing) && !/green:/.test(landing.slice(landing.indexOf('function Chip'), landing.indexOf('function Chip') + 900)),
+  'et sa teinte a disparu du composant aussi (pas seulement de la page)');
 ok(/20 exports offerts|exports offerts/.test(landing) && /Aucune installation/.test(landing), 'les deux pastilles qui restent sont intactes');
 ok(/vos prestations reviennent d’un document à l’autre/.test(landing), 'landing : le carnet est annoncé, comme il fonctionne');
 const faq = flat('src/components/FAQModal.tsx');

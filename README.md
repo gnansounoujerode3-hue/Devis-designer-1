@@ -295,7 +295,7 @@ devis-designer/
 │   ├── deploy_test.tsx # Ce qui casse à la mise en ligne (55 assertions)
 │   ├── payment_test.tsx # Le Worker rejoué sous Node : annulation, code unique, Pulse (45 assertions)
 │   ├── services_test.tsx # Le carnet de prestations et les astérisques du paiement (65 assertions)
-│   ├── emitter_test.tsx # Le carnet d'émetteurs (57 assertions)
+│   ├── emitter_test.tsx # Le carnet d'émetteurs, la numérotation et le callback (61 assertions)
 │   ├── landing_test.tsx# Vérité des copies de la page d'accueil (80 assertions)
 │   └── fixtures/       # Modèles de test (probe-a, probe-b, hooks) packés comme de vrais fichiers
 └── src/                # (designs/*.dddesign.js : artefacts livrés aux clients, hors Git)
@@ -634,7 +634,7 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 497 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 501 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 

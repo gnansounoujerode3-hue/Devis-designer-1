@@ -128,6 +128,18 @@ ok(/SUPPR/.test(app) && /handleDeleteEmitter\(e\.id\)/.test(app), 'une fiche se 
 ok(/handleLoadEmitter\(e\)/.test(app) && /« \$\{e\.label\} » appliqué au document en cours/.test(app), 'un tap applique la fiche au document en cours');
 ok(/Renseignez d.abord votre nom ou votre société/.test(app), 'sauvegarde refusée sans nom : la raison est dite');
 
+/* ---------- 7 bis. Deux détails qui mentaient, et qui ne doivent plus mentir ---------- */
+const appSrc = src('src/App.tsx');
+ok(!/Numerotation auto: (?:DEV|FAC)-20\d\d/.test(appSrc),
+  'l\'indice de numérotation ne fige plus une année dans le texte', (appSrc.match(/Numerotation auto[^<]{0,40}/) || [''])[0]);
+ok(/NUMYEAR|numYear}-XXX/.test(appSrc) && /const numYear = new Date\(\)\.getFullYear\(\);/.test(appSrc),
+  'il reprend l\'année du compteur, la même que getNextNumber', (appSrc.match(/numYear[^;]{0,40}/) || [''])[0]);
+const cfgSrc = src('src/lib/config.ts');
+ok(!cfgSrc.includes("'/#/paiement-confirme'"),
+  'plus de route fantôme dans le callback Chariow legacy (le routeur ne la connaît pas)');
+ok(/callback_url: window\.location\.origin \+ '\/\#\/app'/.test(cfgSrc),
+  'le callback pointe sur #/app, la vue qui relit vraiment le Worker', (cfgSrc.match(/callback_url[^,]{0,60}/) || [''])[0]);
+
 const landing = flat('src/components/LandingPage.tsx');
 ok(/dupliquez le pr/.test(landing) === false, 'landing : le « dupliquez le précédent » n\'est plus la promesse');
 ok(/SAUVEGARDER CETTE FICHE/.test(landing), 'landing : l\'étape 1 renvoie au bouton qui existe vraiment');

@@ -613,6 +613,10 @@ export default function App() {
   const sub = data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const total = sub * (1 + data.taxRate / 100);
   const curShort = CURRENCY_SHORT[data.currency] || 'F';
+  /* L'indice de numérotation prend l'année RÉELLE du compteur (getNextNumber) : écrire « 2025 » en
+     dur faisait mentir l'éditeur au 1er janvier, et un indice faux sur un champ qu'on ne remplit pas
+     soi-même est le meilleur moyen de se faire corriger par un client. */
+  const numYear = new Date().getFullYear();
   const tabs = ['Emetteur', 'Client', 'Devis', 'Prestations', 'Style'];
   const statusInfo = STATUS_META[data.status];
 
@@ -967,8 +971,8 @@ export default function App() {
               <div>
                 <label className={`text-[11px] font-bold tracking-wider uppercase mb-2 block ${dark ? 'text-zinc-400' : 'text-[#999]'}`}>TYPE DE DOCUMENT</label>
                 <div className="flex gap-2">{(['devis', 'facture'] as const).map(t => (<button key={t} onClick={() => { const nextType = t; const nextNum = getNextNumber(nextType); set('docType', nextType); set('quoteNumber', nextNum); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold tracking-wider border-2 transition-all ${data.docType === t ? 'shadow-sm' : 'bg-[#FAFAFA] text-[#999] dark:bg-zinc-800 dark:text-zinc-400'}`} style={data.docType === t ? { borderColor: data.accentColor, color: data.accentColor, background: dark ? '#1a1a2e' : '#F8F8FF' } : { borderColor: dark ? '#333' : '#ECECEC' }}>{t.toUpperCase()}</button>))}</div>
-                {data.docType === 'facture' && <div className="text-[10px] text-[#999] mt-1">Numerotation auto: FAC-2025-XXX</div>}
-                {data.docType === 'devis' && <div className="text-[10px] text-[#999] mt-1">Numerotation auto: DEV-2025-XXX — sans doublon</div>}
+                {data.docType === 'facture' && <div className="text-[10px] text-[#999] mt-1">{`Numerotation auto: FAC-${numYear}-XXX`}</div>}
+                {data.docType === 'devis' && <div className="text-[10px] text-[#999] mt-1">{`Numerotation auto: DEV-${numYear}-XXX — sans doublon`}</div>}
               </div>
               {data.docType === 'devis' && (<button onClick={handleConvert} className="w-full py-2.5 rounded-lg bg-[#10B981] text-white text-xs font-bold tracking-wider hover:opacity-90 transition-opacity">CONVERTIR EN FACTURE</button>)}
               <div><label className={`text-[11px] font-bold tracking-wider uppercase mb-2 block ${dark ? 'text-zinc-400' : 'text-[#999]'}`}>STATUT</label><div className="flex flex-wrap gap-2">{ALL_STATUSES.map(s => { const m = STATUS_META[s]; return (<button key={s} onClick={() => set('status', s)} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${data.status === s ? 'ring-2 ring-offset-1 dark:ring-offset-zinc-900' : 'opacity-60 hover:opacity-100'}`} style={{ color: m.color, background: dark && data.status !== s ? '#27272a' : m.bg }}>{m.label}</button>); })}</div></div>

@@ -110,10 +110,12 @@ function IconTile({ name, dark }: { name: IconName; dark: boolean }) {
 
 /* ============================ UI atoms ============================ */
 
-function Chip({ children, tone = 'blue', dark }: { children: ReactNode; tone?: 'blue' | 'green' | 'neutral'; dark: boolean }) {
+/* Deux teintes, pas trois : le vert avait été donné à la pastille « Paiement Mobile Money en
+   ligne », retirée de l'accueil sur demande du propriétaire. La garder ici aurait laissé dans le
+   code une promesse que plus personne n'affiche. */
+function Chip({ children, tone = 'blue', dark }: { children: ReactNode; tone?: 'blue' | 'neutral'; dark: boolean }) {
   const tones = {
     blue: dark ? 'bg-blue-950/40 text-blue-300 border-blue-900' : 'bg-blue-50 text-[#0057FF] border-[#0057FF]/20',
-    green: dark ? 'bg-green-950/40 text-green-300 border-green-900' : 'bg-green-50 text-green-700 border-green-200',
     neutral: dark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-[#F6F6F6] text-[#555] border-[#E8E8E8]',
   } as const;
   return (
