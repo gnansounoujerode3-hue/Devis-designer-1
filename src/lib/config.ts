@@ -43,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.3.7';
+export const APP_VERSION = '1.3.8';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'npm run deploy publie sur Cloudflare, et vite/esbuild aux versions corrigées sous Windows (2026-09-08)';
+export const BUILD_TAG = 'vignette WhatsApp : balises og: en tête du <head>, robots.txt publié (2026-09-08)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).

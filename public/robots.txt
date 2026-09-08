@@ -1,0 +1,14 @@
+# Les robots d'aperçu (WhatsApp, Facebook, LinkedIn, Twitter) DOIVENT passer :
+# sans eux, un lien partagé part sans titre, sans description et sans vignette.
+# Le fichier existe aussi pour une raison technique : l'app est servie avec un
+# fallback SPA, donc une URL inexistante répond le HTML de l'application avec un
+# code 200 — un crawler qui demande /robots.txt recevrait sinon une page HTML
+# qu'il essaierait de lire comme des règles.
+User-agent: *
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: WhatsApp
+Allow: /

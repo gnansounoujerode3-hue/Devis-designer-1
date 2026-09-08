@@ -93,6 +93,31 @@ for (const m of ['og:url', 'og:image', 'twitter:image', 'canonical']) {
 const ld = (read('index.html').match(/"@type":\s*"SoftwareApplication"[\s\S]{0,400}/) || [''])[0];
 ok(ld.includes(`"url": "https://${appHost}/"`), 'index.html : le JSON-LD (SoftwareApplication) déclare la même adresse', ld.slice(0, 90));
 
+/* ---------- 2 bis. Ce que VOIT le robot d'aperçu de WhatsApp ---------- */
+/* Un <head> correct mais lu trop tard ne donne aucun visuel : les robots ne
+   lisent pas un HTML de 1,5 Mo en entier. Le favicon en base64 pèse 12,5 ko ;
+   déclaré avant les balises og:, il les rejetait à l'octet 13 700. */
+const headBytes = (html.match(/^[\s\S]*?<\/head>/) || [''])[0];
+const off = (tag: string) => Buffer.byteLength(headBytes.slice(0, headBytes.indexOf(tag)), 'utf8');
+ok(headBytes.includes('og:image') && off('og:image') > 0 && off('og:image') < 1500,
+   'og:image est dans les 1 500 premiers octets du <head>', 'octet ' + off('og:image'));
+ok(headBytes.indexOf('og:image:alt') < headBytes.indexOf('<link rel="icon"'),
+   'le favicon (data: base64) est déclaré APRÈS le bloc og:');
+ok(/property="og:locale" content="fr_FR"/.test(headBytes), 'og:locale déclaré (les robots trient par langue)');
+/* /robots.txt doit exister en tant que fichier : sinon le fallback SPA répond le
+   HTML de l'app en 200 et le robot lit des règles là où il y a une page. */
+ok(has('public/robots.txt'), 'public/robots.txt existe (sinon le fallback SPA répond du HTML aux robots)');
+const robots = has('public/robots.txt') ? read('public/robots.txt') : '';
+ok(/User-agent: facebookexternalhit\s*\nAllow: \//.test(robots), 'robots.txt autorise explicitement facebookexternalhit', robots.slice(0, 60));
+ok(!/^Disallow:/m.test(robots), 'robots.txt ne bloque aucune page (le mur de paiement non plus)');
+/* Le README doit donner de quoi diagnostiquer sans deviner : le bon outil, les
+   quatre causes, et le fait que chaque hôte a son propre <head>. */
+ok(read('README.md').includes('https://developers.facebook.com/tools/debug/'),
+   'README : le Shared Debugger de Facebook est pointé par sa vraie URL');
+for (const clue of ['Bot Fight Mode', '?v=2', 'Un message = une URL', 'text/html']) {
+  ok(read('README.md').includes(clue), `README : la cause « ${clue} » est écrite noir sur blanc`);
+}
+
 /* ---------- 3. Les commandes annoncées existent ---------- */
 const pkg = JSON.parse(read('package.json'));
 ok(/wrangler deploy/.test(pkg.scripts['deploy:cf'] || ''), 'package.json : npm run deploy:cf déploie sur Cloudflare', pkg.scripts['deploy:cf']);

@@ -9,7 +9,7 @@ mises à jour automatiques. Le site présente deux vues : une **page d'accueil p
 
 ```bash
 npm install        # installer les dépendances
-npm test           # 8 suites, 511 assertions, tout ce qui casse en silence
+npm test           # 8 suites, 522 assertions, tout ce qui casse en silence
 npm run build      # build de production (fichier unique dist/index.html)
 npm run preview    # prévisualiser le build (localhost seulement)
 npm run dev        # serveur de développement (http://localhost:5173)
@@ -228,7 +228,13 @@ Trois règles, vérifiées par `npm run test:ui` :
 - le fichier est un **PNG raster** de **1200×630** (pas de SVG : les robots d'aperçu ne le
   lisent pas), sous 400 ko, et vit dans `public/` pour que Vite le recopie dans `dist/` ;
 - les dimensions déclarées (`og:image:width` / `:height`) sont les dimensions **réelles** du
-  fichier.
+  fichier ;
+- le bloc `og:` est dans les **1 500 premiers octets** du `<head>`. Un favicon en `data:` base64
+  pèse 12 500 octets : placé avant les balises, il les enterre à l'octet 13 700 — et les robots
+  d'aperçu, eux, ne lisent pas tout. Le favicon est donc déclaré **après** le bloc `og:` ;
+- `public/robots.txt` existe. Sans lui, `/robots.txt` retombe sur le fallback SPA et le crawler
+  reçoit le HTML de l'application avec un code 200 : il croit lire des règles, n'y comprend rien,
+  et l'aperçu peut être refusé sans que personne ne voie d'erreur.
 
 Pour la refaire (copie, prix, couleurs) :
 
@@ -250,6 +256,45 @@ répéter (58 caractères) a été testé : la vignette reste lisible.
 > **Après déploiement**, si WhatsApp affiche toujours l'ancien aperçu : il **met la vignette
 > en cache**. Renvoyez le lien avec un paramètre différent (`https://devis-designer-app.jerode.workers.dev/?v=2`)
 > pour le forcer à re-scroller la page, ou attendez quelques heures.
+
+### Le visuel n'apparaît pas : les quatre causes, dans l'ordre où les vérifier
+
+Un aperçu qui ne vient pas n'est presque jamais un problème de balises manquantes — c'est
+une de ces quatre choses, et elles ne se soignent pas pareil :
+
+1. **Ce n'est pas cette adresse qu'on partage.** Chaque hôte a **son propre** `<head>`, et donc ses
+   propres balises d'aperçu : le miroir Netlify — l'adresse historique, option 2 plus bas — sert
+   encore un bundle d'avant, sans `og:image`. Un lien qui part de là n'aura jamais de visuel,
+   même quand le domaine public est parfait. Vérifier l'adresse **réellement collée** dans la
+   conversation, pas celle du README. `VENDOR.DOWNLOAD_LINK` (`src/lib/config.ts`) est ce que l'app
+   écrit dans ses propres messages de partage : c'est lui qui doit porter la bonne URL.
+2. **Le crawler est bloqué, pas le navigateur.** WhatsApp et Facebook demandent la page avec un
+   user-agent de robot (`WhatsApp/2.x`, `facebookexternalhit/1.1`). Une protection anti-bot
+   Cloudflare (*Security → Bots → Bot Fight Mode*, ou le niveau « I'm under attack ») répond
+   alors un défi HTML au robot, et le navigateur ne verra jamais la différence. Diagnostic
+   exact, à faire **d'abord** parce qu'il affiche la réponse du robot de Facebook :
+   <https://developers.facebook.com/tools/debug/> — le « Sharing Debugger » de Facebook, qui
+   rejoue la requête du robot d'aperçu de WhatsApp et affiche l'erreur exacte s'il y en a une. En ligne de commande :
+   ```bash
+   curl -sS -A "WhatsApp/2.23.22.70" https://devis-designer-app.jerode.workers.dev/ | head -c 900
+   curl -sSI https://devis-designer-app.jerode.workers.dev/og-image.png | head -5
+   # PowerShell : Invoke-WebRequest -UserAgent "WhatsApp/2.23.22.70" <url> | Select -Expand Content
+   ```
+   La première commande doit rendre du HTML commençant par `og:locale`/`og:type`/`og:image` ;
+   s'il rend une page « Just a moment… » ou un code 403/503, c'est le WAF : autoriser les deux
+   user-agents ci-dessus plutôt que de laisser un captcha devant un robot.
+   La seconde doit rendre `Content-Type: image/png` **et un `Content-Length` d'environ 78 000**.
+   Si c'est `text/html` : le fichier n'est pas dans le dossier publié — le fallback SPA a servi
+   l'application au lieu d'un 404, et le robot a renoncé silencieusement. C'est ce qui arrive
+   quand on publie `dist/index.html` **seul** au lieu du dossier `dist/` entier.
+3. **Le cache de l'aperçu.** WhatsApp garde la vignette (et l'absence de vignette) plusieurs
+   jours. Après une correction, on ne teste pas avec le lien d'avant : on envoie
+   `https://devis-designer-app.jerode.workers.dev/?v=2` — le paramètre force un scraping neuf.
+   Le Debugger Facebook a un bouton « Scrape Again » pour la même raison.
+4. **Le lien est noyé dans le message.** Une vignette n'apparaît que si l'URL porte le message.
+   Un texte de trois lignes avant le lien, ou deux liens dans la même bulle, et WhatsApp
+   n'affiche plus rien — ce n'est pas un bug, c'est la règle. Un message = une URL, et la
+   légende part dans le message suivant.
 
 ## Page d'accueil publique (landing)
 
@@ -303,7 +348,7 @@ devis-designer/
 │   ├── design_test.tsx # Tout le trajet du design personnalisé (67 assertions)
 │   ├── pulse_test.tsx  # La sonde du Pulse Chariow, état par état (59 assertions)
 │   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (69 assertions)
-│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne, y compris les commandes et les pins (65 assertions)
+│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne, y compris les commandes, les pins et ce que voit le robot d'aperçu (76 assertions)
 │   ├── payment_test.tsx # Le Worker rejoué sous Node : annulation, code unique, Pulse (45 assertions)
 │   ├── services_test.tsx # Le carnet de prestations et les astérisques du paiement (65 assertions)
 │   ├── emitter_test.tsx # Le carnet d'émetteurs, la numérotation et le callback (61 assertions)
@@ -646,14 +691,14 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.7` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.8` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse + annulation détectée dans /check)` |
 | Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 511 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 522 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
