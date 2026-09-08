@@ -63,9 +63,10 @@ export function analyzePulse(debug: Record<string, unknown> | null | undefined, 
   const secretRotated = !!cfgSuffix && !!lastSuffix && cfgSuffix !== lastSuffix;
   const rotated = secretRotated
     ? ' \u26a0 Le secret enregistr\u00e9 sur le Worker (…' + cfgSuffix + ') n\u2019est plus celui qui a v\u00e9rifi\u00e9 la derni\u00e8re d\u00e9livrance (…'
-      + lastSuffix + ') : vous l\u2019avez chang\u00e9. Si le Pulse c\u00f4t\u00e9 Chariow porte toujours l\u2019ancien, la prochaine vente pay\u00e9e '
-      + 'sera refus\u00e9e (signature invalide) et le client aura pay\u00e9 sans \u00eatre activ\u00e9. Collez le whsec_... affich\u00e9 par Chariow dans '
-      + 'CHARIOW_PULSE_SECRET et red\u00e9ployez le Worker.'
+      + lastSuffix + ') : vous l\u2019avez chang\u00e9. C\u2019est normal dans la minute qui suit la rotation \u2014 ça ne passe qu\u2019au premier Pulse reçu '
+      + 'avec le nouveau secret. Si un paiement confirm\u00e9 arrive et que cette ligne reste rouge, les deux c\u00f4t\u00e9s ne se correspondent pas : '
+      + 'recopiez le whsec_... affich\u00e9 par Chariow dans CHARIOW_PULSE_SECRET (wrangler secret put, puis red\u00e9ploiement du Worker), '
+      + 'jamais l\u2019inverse \u2014 sinon la prochaine vente pay\u00e9e re\u00e7oit un 401 (signature invalide) et le client aura pay\u00e9 sans \u00eatre activ\u00e9.'
     : '';
 
   const mk = (verdict: PulseVerdict, titre: string, detail: string): PulseStatus =>
