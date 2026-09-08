@@ -143,7 +143,8 @@ export default function LegalModal({ open, onClose, initialTab }: Props) {
                 l'appareil est connecté.
               </Section>
               <Section n="3" title="Stockage">
-                Les documents, clients, logos et signatures sont stockés exclusivement dans le navigateur de l'appareil
+                Les documents, clients, logos, signatures, fiches émetteurs et prestations mémorisées sont stockés
+                exclusivement dans le navigateur de l'appareil
                 de l'utilisateur (localStorage et IndexedDB) : ils ne sont jamais transmis à un serveur et ne sont pas
                 partagés avec des tiers. Les données techniques de comptage sont conservées côté serveur le temps de la
                 période de quota (30 jours glissants) et de la validité des codes de licence, puis écrasées ; elles ne

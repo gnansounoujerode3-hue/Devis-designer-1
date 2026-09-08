@@ -104,7 +104,8 @@ gardez une copie de vos `.tsx` (c'est votre archive).
 ## Carnet d'émetteurs et fichier clients
 
 Les deux carnets sont le même mécanisme appliqué aux deux bouts du document, et l'un sans l'autre
-laisserait le client ressaisir quelque chose :
+laisserait le client ressaisir quelque chose (un troisième, le carnet des **prestations**, est documenté
+plus bas — même philosophie, pour les lignes du tableau) :
 
 | | Clients | Émetteurs |
 | --- | --- | --- |
@@ -300,14 +301,17 @@ devis-designer/
 └── src/                # (designs/*.dddesign.js : artefacts livrés aux clients, hors Git)
     ├── main.tsx        # Bootstrap React
     ├── App.tsx         # Composant racine
-    ├── components/     # LandingPage (accueil public), Paywall, Espace vendeur (VendorPage),
-    │                   # CustomDesignCard (import du fichier), FAQ, Legal, Onboarding...
+    ├── components/     # LandingPage (accueil public), Paywall (mur de paiement), Espace vendeur
+    │                   # (VendorPage), CustomDesignCard (import du fichier), ServicesPicker
+    │                   # (carnet de prestations), FAQ, Legal, Onboarding...
     ├── templates/      # Les 12 templates SVG + index.ts (registre, + les designs importés)
     ├── lib/            # route (accueil ↔ app), license (codes émis en local),
     │                   # quota (compteur serveur), referral (parrainage),
     │                   # designSecret (format .dddesign.js + HMAC),
     │                   # customDesign (les 6 emplacements du client),
-    │                   # adminKey (clé ADMIN_PASS), config, store...
+    │                   # adminKey (clé ADMIN_PASS), config, store,
+    │                   # workerBase (les adresses du Worker et leur sonde),
+    │                   # pulse (l'état du webhook Chariow, lu depuis /debug)...
     ├── store.ts        # Persistance localStorage + sauvegarde JSON
     ├── types.ts        # Types partagés
     └── assets/         # Logo
@@ -334,11 +338,15 @@ devis-designer/
 `AUTO_PAY_WORKER_URL` pointe sur votre Worker, et `productIds.DESIGN` est activé) :
 
 1. Le client crée ses devis librement. Chaque **export PDF** ou **envoi pour signature** consomme 1 des 20 gratuits.
-2. Épuisé → bouton **« PRO »** → l'offre → **« Payer … activation auto »** : le Worker crée la vente
-   (`POST /checkout` → `api.chariow.com/v1/checkout`) et ouvre la caisse Chariow
-   (Mobile Money : MTN MoMo, Orange Money, Wave, Moov — commission 15 %).
+2. Épuisé → bouton **« PRO »** → l'offre → le client renseigne **nom, numéro Mobile Money et email**
+   (les trois champs marqués `*` du mur de paiement — Chariow en a besoin pour la vente) → **« Payer …
+   activation auto »** : le Worker crée la vente (`POST /checkout` → `api.chariow.com/v1/checkout`) et
+   ouvre la caisse Chariow (Mobile Money : MTN MoMo, Orange Money, Wave, Moov — commission 15 %).
 3. Pulse (webhook) confirme la vente → le Worker émet le code, l'app le relève (`/check`) et
-   l'applique **toute seule**. Le client n'a **aucun code à recopier**.
+   l'applique **toute seule**. Le client n'a **aucun code à recopier**. Et s'il annule la demande sur
+   son téléphone, l'attente s'arrête là : `/check` lit `payment.status` et rend « paiement annulé »
+   au lieu de laisser tourner un bandeau d'attente (voir « Le client annule le paiement sur son
+   téléphone »).
 
 **2. Le secours — virement Mobile Money direct + code saisi** (caisse injoignable, client
 sans compte MoMo, paiement en espèces, Worker hors service) :
@@ -620,7 +628,7 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
 | Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.6` |
-| Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse dans /debug)` |
+| Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse + annulation détectée dans /check)` |
 | Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
