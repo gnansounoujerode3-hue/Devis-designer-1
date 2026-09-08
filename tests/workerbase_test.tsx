@@ -126,6 +126,13 @@ ok((paywall.match(/void warmWorkerBase\(4000\);/g) || []).length === 2,
   'lancement ET vérification re-sondent la liste après une panne réseau', String((paywall.match(/void warmWorkerBase\(4000\);/g) || []).length));
 ok(/let netFails = 0;/.test(paywall) && /netFails === 3/.test(paywall), 'le polling compte les échecs réseau (silence de 16 min = puni)');
 ok(/votre paiement ne sera pas perdu/.test(paywall), 'et le client qui a déjà payé est rassuré par écrit');
+ok(/const recent = Date\.now\(\) - \(last\.at \|\| 0\) < 20 \* 60000;/.test(paywall),
+  'à la réouverture, la vente est relue quel que soit son âge (payé puis fenêtre fermée = activé)');
+ok(/status === 'pending' && recent/.test(paywall), 'mais le polling de reprise ne reprend que sur une vente récente');
+ok(/Expirée ou abandonnée depuis trop longtemps[\s\S]{0,200}removeItem\('dd_last_purchase'\)/.test(paywall),
+  'une vente expirée est oubliée en silence : pas de message rouge pour rien');
+ok(/il a déjà été utilisé sur un autre appareil/.test(paywall),
+  'payé mais déjà livré ailleurs : c’est écrit, et ça se règle à la main');
 ok(!/e\.message/.test(read('src/lib/quota.ts').split('\n').filter(l => /setMsg|setMessage|catch \(e\)/.test(l)).join('\n')),
   'quota.ts n’affiche pas non plus une exception brute');
 const pkg = JSON.parse(read('package.json'));

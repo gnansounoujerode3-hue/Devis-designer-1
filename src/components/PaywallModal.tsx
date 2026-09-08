@@ -74,17 +74,29 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
     if (!open || !autoPay) return;
     let last: { purchaseId: string; at: number } | null = null;
     try { const r = localStorage.getItem('dd_last_purchase'); if (r) last = JSON.parse(r); } catch { last = null; }
-    if (last && last.purchaseId && Date.now() - last.at < 20 * 60000) {
-      const pid = last.purchaseId;
-      fetch(workerBase() + '/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ purchaseId: pid, deviceId: getMyRefCode() }),
-      }).then(r => r.json()).then(data => {
-        if (data.ok && data.status === 'paid' && data.code) activateCode(data.code);
-        else if (data.ok && data.status === 'pending') { setAutoState('waiting'); startPolling(pid); }
-      }).catch(() => { /* réseau : on ignore, l'utilisateur peut relancer */ });
-    }
+    if (!last || !last.purchaseId) return;
+    // L'âge ne doit pas empêcher la lecture : un client qui a payé puis fermé la fenêtre
+    // (ou dont le Pulse était cassé) doit être activé à la réouverture, pas devoir relancer
+    // un paiement. Seule la reprise du polling reste limitée à une vente récente.
+    const pid = last.purchaseId;
+    const recent = Date.now() - (last.at || 0) < 20 * 60000;
+    fetch(workerBase() + '/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purchaseId: pid, deviceId: getMyRefCode() }),
+    }).then(r => r.json()).then(data => {
+      if (data.ok && data.status === 'paid' && data.code) activateCode(data.code);
+      else if (data.ok && data.status === 'paid') {
+        // Payé, mais le code est parti sur une autre installation : à traiter à la main.
+        setAutoState('error');
+        setAutoMsg('Votre paiement est bien confirmé chez le vendeur, mais il a déjà été utilisé sur un autre appareil. Contactez le vendeur avec la référence du paiement : il délivrera un nouveau code.');
+      } else if (data.ok && data.status === 'pending' && recent) { setAutoState('waiting'); startPolling(pid); }
+      else {
+        // Expirée ou abandonnée depuis trop longtemps : on oublie la référence, le client
+        // repart sur un paiement normal sans message d'erreur.
+        try { localStorage.removeItem('dd_last_purchase'); } catch { /* ignore */ }
+      }
+    }).catch(() => { /* reseau : on ignore, l'utilisateur peut relancer */ });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

@@ -241,7 +241,7 @@ devis-designer/
 │   ├── shim.js         # localStorage/document/window minimaux pour rendre du React sous Node
 │   ├── design_test.tsx # Tout le trajet du design personnalisé (67 assertions)
 │   ├── pulse_test.tsx  # La sonde du Pulse Chariow, état par état (59 assertions)
-│   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (65 assertions)
+│   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (69 assertions)
 │   ├── deploy_test.tsx # Ce qui casse à la mise en ligne (55 assertions)
 │   ├── emitter_test.tsx # Le carnet d'émetteurs (57 assertions)
 │   ├── landing_test.tsx# Vérité des copies de la page d'accueil (80 assertions)
@@ -378,6 +378,13 @@ dans la fenêtre de paiement, et ce que vous faites :
 | « Le serveur de paiement est injoignable depuis votre réseau » | aucune des adresses déclarées n'a répondu : Worker non déployé, sous-domaine renommé, ou connexion du client en rade | le client paie au numéro du vendeur et vous générez le code vous-même ; puis vous vérifiez `GET <url>/debug` de chez vous |
 | « La réponse du serveur de paiement est illisible » | l'adresse répond, mais pas en JSON — page d'erreur, domaine expiré, proxy qui sert autre chose | l'URL est mauvaise ou sert un autre site : corrigez `AUTO_PAY_WORKER_URL` |
 | carte Pulse « Aucun Pulse n'est jamais arrivé » alors que le client a payé | l'argent est entré chez Chariow, l'automation n'a pas suivi | voyez « Reprendre la main » ci-dessus ; si le client garde la fenêtre ouverte, `/check` finit par émettre le code |
+
+**Un client a payé mais n'est pas activé ?** Pas besoin de le rembourser ni de lui fabriquer un
+code à la main : la fenêtre de paiement relit la vente **à chaque réouverture**, quel que soit son
+âge (`GET /check` → le Worker relit la vente chez Chariow, et lui rend le code une seule fois).
+Dites-lui simplement de rouvrir l'application et d'accepter le mur de paiement qui s'affiche. Si la
+vente a plus de 15 minutes et que Chariow l'a déjà marquée abandonnée, là oui : générez le code dans
+`#/vendeur` et envoyez-le.
 
 Aucun de ces messages n'est l'anglais technique de l'exception d'origine : une `fetch` qui échoue
 produit un `TypeError: Failed to fetch` **inintelligible**, et c'est exactement ce que voyait le
@@ -521,14 +528,14 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.3` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.4` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse dans /debug)` |
 | Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 383 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 387 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
