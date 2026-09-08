@@ -22,7 +22,7 @@ export default {
       /* ---- 0. DIAGNOSTIC (ouverture dans le navigateur) ---- */
       if (path === '/debug' && request.method === 'GET') {
         const out = {
-          version: "2026-09-07 (quota + parrainage serveur + DESIGN = design + 1 mois d'exports)",
+          version: "2026-09-08 (quota + parrainage + DESIGN + sonde Pulse dans /debug)",
           secretKeysCount: Object.keys(getSecretKeys(env)).length,
           adminPassSet: getAdminPass(env) !== 'change-me',
           /* Contrôles de déploiement : si ces lignes manquent, l'app retombe en local. */
@@ -68,6 +68,37 @@ export default {
           const listed = await env.DD_KV.list({ prefix: 'pay:' });
           out.pendingPayments = (listed.keys || []).map(k => k.name).slice(-10);
         } catch { out.pendingPayments = 'KV list indisponible'; }
+
+        /* Sonde Pulse : l'URL que Chariow DOIT rappeler, et si elle rappelle.
+           Cette URL porte le sous-domaine du compte Cloudflare ; le renommer
+           (ou changer de Worker) la casse en silence côté Chariow. Le Worker,
+           lui, connaît sa propre adresse : c'est elle qu'on renvoie, pas une
+           adresse recopiée dans le code de l'app. */
+        const lastHook = out.lastWebhook && typeof out.lastWebhook === 'object' ? out.lastWebhook : null;
+        let pendingN = 0, oldestMin = 0;
+        try {
+          for (const k of (Array.isArray(out.pendingPayments) ? out.pendingPayments : [])) {
+            const r = await kvGet(env, k, null);
+            if (r && r.status === 'pending') {
+              pendingN++;
+              const m = Math.floor((Date.now() - (r.createdAt || 0)) / 60000);
+              if (m > oldestMin) oldestMin = m;
+            }
+          }
+        } catch { /* KV capricieuse : le compte reste à 0, le reste du diagnostic passe */ }
+        out.webhookUrl = new URL(request.url).origin + '/webhook';
+        out.pulse = {
+          url: out.webhookUrl,
+          secretSet: out.pulseSecret !== 'ABSENTE',
+          count: out.webhookCount || 0,
+          lastAt: lastHook ? (lastHook.at || null) : null,
+          lastAction: lastHook ? (lastHook.action || null) : null,
+          lastEvent: lastHook ? (lastHook.event || null) : null,
+          lastSignatureOk: lastHook ? !!lastHook.signatureOk : null,
+          minutesSinceLast: lastHook && lastHook.at ? Math.floor((Date.now() - Date.parse(lastHook.at)) / 60000) : null,
+          pending: pendingN,
+          oldestPendingMin: oldestMin,
+        };
         return json({ ok: true, debug: out }, 200, cors);
       }
 

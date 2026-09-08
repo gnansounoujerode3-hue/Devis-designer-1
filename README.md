@@ -141,13 +141,14 @@ Restauration énonce le nombre de fiches, pour que personne ne croie avoir perdu
 npm run test:ui          # ou : npm test
 ```
 
-Quatre suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
+Cinq suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
 le TSX avec un shim DOM minimal — `tests/shim.js` — et laisse `react`/`react-dom` imports de
 `node_modules`, donc le harness rend avec le même React que l'app) :
 
 | Suite | Ce qu'elle tient |
 | --- | --- |
 | `tests/emitter_test.tsx` | La fiche de l'émetteur : pré-remplissage de tout nouveau document par la fiche par défaut (et victoire d'un en-tête explicite), mise à jour sur place au lieu d'un doublon, choix et report de la fiche par défaut, carnet vidé, repli de quota logo (`{ saved, withLogo }`) jusqu'à l'échec total, sauvegarde JSON `version: 3` (remplacement à l'identique, fusion dédupliquée, copie ancienne qui ne vide rien), et les textes réellement écrits à l'écran, dans la FAQ, sur la landing et dans ce README. |
+| `tests/pulse_test.tsx` | La sonde Pulse de l'espace vendeur : les cinq pannes du webhook Chariow se traduisent en cinq phrases distinctes (injoignable ≠ jamais-reçu ≠ signature refusée ≠ silence ≠ vivant), l'URL à coller chez Chariow est toujours celle annoncée par le Worker, `analyzePulse` ne plante sur aucun `debug` fabuleux (chaîne, date illisible, compteur non numérique), chaque verdict a sa couleur, et le Worker exporte bien `webhookUrl` + `pulse.*`. |
 | `tests/deploy_test.tsx` | L'hébergement : `wrangler.jsonc` est un Worker d'assets valide (dist, fallback SPA, aucun script, nom distinct de celui du Worker d'API) ; **un seul domaine public** dans `index.html`, `config.ts`, la landing, la page vendeur, le shim de test, la vignette et ce README ; les commandes annoncées (`deploy:cf`) existent ; le README dit la vérité sur Cloudflare et sur le déménagement d'origine (`localStorage`). |
 | `tests/design_test.tsx` | Tout le trajet du design sur mesure : pack du vendeur → fichier signé → refus des fichiers modifiés, tronqués, trop gros → import → **rendu par le vrai `QuoteSVG`** → emplacements 1 à 6 (ajout, remplacement, plafond, retrait) → sauvegarde JSON et restauration (avec blob falsifié) → code d'activation `DESIGN` → carte d'import dans les deux états. Les gabarits testés sont dans `tests/fixtures/`. |
 | `tests/landing_test.tsx` | La page d'accueil se rend ; ses chiffres viennent des constantes (`PRICE_*`, `FREE_EXPORT_LIMIT`, `TEMPLATES.length`) et non de nombres recopiés ; aucune promesse interdite (mode hors-ligne, téléchargement, témoignages et étoiles inventés, ancien forfait de 3 mois, avoir) ; aucun emoji ; chaque mention du réseau dit la vérité ; la vignette de partage existe, fait 1200×630 et est déclarée sur le bon domaine. |
@@ -330,9 +331,33 @@ Client                Worker Cloudflare              Chariow
    - Créez 4 produits et notez leurs IDs (`prd_...`) :
      Abonnement 1 mois (2 000 F) · Abonnement 1 an (15 000 F) ·
      Design personnalisé (5 000 F) · Tous les designs (50 000 F)
-   - **Automations → Pulses** : créez un Pulse vers
-     `https://VOTRE-WORKER.workers.dev/webhook` (événements de vente),
-     puis copiez son **secret de signature** (`whsec_...`)
+   - **Automations → Pulses** : créez un Pulse vers l'URL `/webhook` **du Worker d'API**
+     (pas de l'application !) — aujourd'hui
+     `https://devisdesigner.gnansounoujerode3.workers.dev/webhook`, événements de vente.
+     Ne la recopiez d'aucun fichier : demandez-la au Worker, qui connaît sa propre adresse —
+     `GET https://…workers.dev/debug` → champ `webhookUrl` (et `pulse.url`). C'est aussi ce
+     qu'affiche la carte **Pulse Chariow** de l'espace `#/vendeur`, bouton « Copier l'URL ».
+     Puis copiez son **secret de signature** (`whsec_...`).
+
+2. **Worker** : enregistrez `CHARIOW_KEY`, `CHARIOW_PULSE_SECRET` (le `whsec_...` **brut** : le
+   Worker tolère un espace ou un guillemet de collage, mais ne compte pas dessus), `PRODUCT_IDS`
+   (JSON `{ MONTHLY, ANNUAL, DESIGN, ALL }`), puis redéployez.
+
+3. **Vérifier le branchement** — espace `#/vendeur`, carte **Pulse Chariow** : voyant vert
+   « Pulse vivant », sinon le texte dit quoi faire. Les trois pannes réellement possibles sont
+   distinctes et libellées séparément : `Aucun Pulse n'est jamais arrivé` (le Pulse n'existe pas
+   ou ne pointe pas ici), `Le Pulse arrive, mais sa signature est refusée` (secret différent des
+   deux côtés), `Silence depuis X min avec N paiement(s) en attente` (l'URL a bougé sous vos pieds).
+   Équivalent en ligne de commande : `/debug` → `webhookCount`, `lastWebhook.action`,
+   `pulse.pending`, `pulse.minutesSinceLast`.
+
+4. **Après un déménagement du Worker** (nouveau nom de Worker, sous-domaine de compte renommé,
+   passage sur un domaine à vous) : **le Pulse ne suit pas tout seul.** Chariow continue de rappeler
+   l'ancienne URL, qui ne répond plus — et rien ne sonne chez vous. Le contrat n'est pas rompu pour
+   autant : à chaque relevé, le Worker re-vérifie la vente **auprès de Chariow** (1 appel API maximum
+   toutes les 15 s) et marque la vente payée. Mais ce filet ne joue que tant que le client garde la
+   fenêtre de paiement ouverte — la vente `pending` expire au bout de 15 minutes. Donc : coller la
+   nouvelle `webhookUrl` dans le Pulse Chariow **le jour même**, et vérifier le voyant.
 ### Endpoints du Worker
 
 | Route | Rôle |
@@ -374,8 +399,10 @@ Client                Worker Cloudflare              Chariow
      `CHARIOW_PULSE_SECRET` (le `whsec_...`),
      `PRODUCT_IDS` = `{"MONTHLY":"prd_...","ANNUAL":"prd_...","DESIGN":"prd_...","ALL":"prd_..."}`
    - Storage → KV : créez un namespace `DD_KV` et liez-le au Worker
-3. **L'application** : dans `src/lib/config.ts` →
-   `AUTO_PAY_WORKER_URL = "https://VOTRE-WORKER.workers.dev"`
+3. **L'application** : dans `src/lib/config.ts`, `AUTO_PAY_WORKER_URL` = l'adresse de **votre**
+   Worker (`https://<nom>.<sous-domaine-du-compte>.workers.dev`). Ce dépôt contient déjà l'adresse
+   du Worker déployé : lisez-la dans `src/lib/config.ts` au lieu de la reconstituer, et ne la
+   recopiez nulle part d'après mémoire — `GET <worker>/debug` → `webhookUrl` est la source sûre.
 
 Sécurité : la clé API Chariow ne vit que dans le Worker (jamais dans l'app),
 le webhook est vérifié par signature HMAC, chaque vente est reliée à
@@ -407,6 +434,12 @@ https://devis-designer-app.jerode.workers.dev/#/vendeur
      L'offre « Parrainage — 1 mois offert » (0 F) sert à créditer manuellement un parrain
      (nombre de filleuls récompensés réglable, borné à 12 mois)
    - **Panneau PARRAINAGE** : rappel de la politique + codes de récompense émis et mois crédités
+   - **Carte PULSE CHARIOW** : l'URL exacte que Chariow doit rappeler (lue sur le Worker, jamais
+     recopiée du dépôt), le nombre de délivrances, l'âge de la dernière, les paiements encore en
+     attente, l'état du secret de signature — et un voyant qui nomme la panne : « aucun Pulse
+     n'est jamais arrivé », « le Pulse arrive mais sa signature est refusée », « silence depuis X min
+     avec N paiement(s) en attente ». À regarder le jour où le Worker change d'adresse : c'est le
+     seul maillon de la caisse que ce dépôt ne peut pas corriger tout seul
    - **Panneau QUOTA D'EXPORTS & DÉBLOCAGES** : demandes de déblocage reçues (empreinte,
      note du client, IP/pays, compteur) et boutons 30 j / 7 j / 1 j — voir plus bas
    - **Historique des ventes** : date, client, offre, prix, code, statut (actif/expiré —
@@ -450,13 +483,14 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.1` |
-| Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-07 (quota + parrainage serveur + DESIGN = design + 1 mois d'exports)` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.2` |
+| Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse dans /debug)` |
+| Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 250 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 303 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 

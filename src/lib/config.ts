@@ -43,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.3.1';
+export const APP_VERSION = '1.3.2';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'carnet d\'émetteurs + adresse publique déplacée chez Cloudflare Workers (2026-09-08)';
+export const BUILD_TAG = 'carte Pulse Chariow dans #/vendeur + adresse publique chez Cloudflare Workers (2026-09-08)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).

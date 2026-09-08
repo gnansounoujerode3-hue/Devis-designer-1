@@ -12,6 +12,7 @@ import { goApp } from '../lib/route';
 import VendorQuotaPanel from './VendorQuotaPanel';
 import WorkerKeyBar from './WorkerKeyBar';
 import { fetchWorkerReferralStats, isWorkerReferralEnabled, type WorkerReferralStats } from '../lib/referral';
+import { loadPulseStatus, type PulseStatus } from '../lib/pulse';
 
 /* ============================================================
    ESPACE VENDEUR — page réservée au propriétaire de l'app
@@ -149,6 +150,17 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
     setWloading(false);
   };
   useEffect(() => { if (isWorkerReferralEnabled()) void loadWorkerStats(); }, []);
+
+  /* Le Pulse (webhook Chariow) est le maillon qui casse sans bruit quand le Worker
+     change d'adresse : on l'affiche, avec l'URL exacte que Chariow doit rappeler. */
+  const [pulse, setPulse] = useState<PulseStatus | null>(null);
+  const [pulseBusy, setPulseBusy] = useState(false);
+  const [pulseCopied, setPulseCopied] = useState(false);
+  const loadPulse = async () => {
+    setPulseBusy(true);
+    try { setPulse(await loadPulseStatus()); } finally { setPulseBusy(false); }
+  };
+  useEffect(() => { void loadPulse(); }, []);
 
   const stats = useMemo(() => {
     const now = Date.now();
@@ -369,6 +381,54 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
         {/* Quota d'exports : demandes de déblocage des clients */}
         <VendorQuotaPanel />
 
+        {/* Sonde Pulse : ce que Chariow doit rappeler, et si ça arrive */}
+        <section className="rounded-2xl bg-white dark:bg-zinc-900 border border-[#ECECEC] dark:border-zinc-800 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div>
+              <div className="text-xs font-black tracking-widest text-[#111] dark:text-white">PULSE CHARIOW (CONFIRMATION DES VENTES)</div>
+              <div className="text-[10px] text-[#999] mt-0.5">
+                L'adresse que Chariow rappelle quand une vente bouge. Elle porte le sous-domaine du compte
+                Cloudflare : déménagez le Worker sans le dire ici, et plus rien n'est confirmé en temps réel.
+              </div>
+            </div>
+            <button
+              onClick={() => void loadPulse()}
+              disabled={pulseBusy}
+              className="shrink-0 px-2 py-1 rounded-lg border border-[#E0E0E0] dark:border-zinc-700 text-[10px] font-bold text-[#666] dark:text-zinc-300 hover:bg-[#F5F5F5] dark:hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {pulseBusy ? 'Lecture…' : 'Actualiser'}
+            </button>
+          </div>
+
+          {!pulse ? (
+            <div className="text-[11px] text-[#999]">Aucune donnée reçue du serveur pour l'instant.</div>
+          ) : (
+            <>
+              <div className={`rounded-xl px-3 py-2.5 border ${PULSE_TONE[pulse.verdict]}`}>
+                <div className="text-[11px] font-black text-[#111] dark:text-white">{pulse.titre}</div>
+                <div className="text-[10.5px] text-[#666] dark:text-zinc-300 mt-1 leading-relaxed">{pulse.detail}</div>
+              </div>
+              {pulse.url && (
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 min-w-0 truncate text-[10.5px] font-mono text-[#444] dark:text-zinc-300">{pulse.url}</code>
+                  <button
+                    onClick={() => { navigator.clipboard?.writeText(pulse.url).catch(() => { /* ignore */ }); setPulseCopied(true); }}
+                    className="shrink-0 px-2 py-1 rounded-lg border border-[#E0E0E0] dark:border-zinc-700 text-[10px] font-bold text-[#666] dark:text-zinc-300 hover:bg-[#F5F5F5] dark:hover:bg-zinc-800"
+                  >
+                    {pulseCopied ? 'Copié' : 'Copier l’URL'}
+                  </button>
+                </div>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                <WStat label="DÉLIVRANCES REÇUES" value={String(pulse.count)} />
+                <WStat label="DERNIÈRE" value={pulse.minutesSinceLast >= 0 ? pulse.minutesSinceLast + ' min' : '—'} />
+                <WStat label="PAIEMENTS EN ATTENTE" value={String(pulse.pending)} />
+                <WStat label="SECRET DE SIGNATURE" value={pulse.secretSet ? 'déclaré' : 'ABSENT'} />
+              </div>
+            </>
+          )}
+        </section>
+
         {/* Génération de code */}
         <section className="rounded-2xl bg-white dark:bg-zinc-900 border border-[#ECECEC] dark:border-zinc-800 p-4 sm:p-5">
           <div className="text-xs font-black tracking-widest text-[#111] dark:text-white mb-3">GÉNÉRER UN CODE D'ACTIVATION</div>
@@ -571,6 +631,16 @@ function Dashboard({ dark, setDark, onLogout, onBack }: {
 /* ---------------- Carte statistique ---------------- */
 
 /** Carte de statistique du suivi serveur (Worker). */
+/** Couleur du voyant selon le verdict de la sonde (aucun emoji : un voyant, du texte). */
+const PULSE_TONE: Record<string, string> = {
+  'ok': 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/30',
+  'never': 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30',
+  'silent': 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30',
+  'rejected': 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/30',
+  'offline': 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/30',
+  'no-worker': 'border-[#ECECEC] bg-[#FAFAFA] dark:border-zinc-700 dark:bg-zinc-800/60',
+};
+
 function WStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-950 px-2.5 py-2">
