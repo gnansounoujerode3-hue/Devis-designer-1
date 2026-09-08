@@ -43,6 +43,21 @@ ok(st.verdict === 'ok', 'un Pulse récent et validé = voyant vert', st.verdict)
 ok(/9 délivrance/.test(st.titre), 'le nombre de délivrances est lu, pas inventé', st.titre);
 ok(st.probe === false && /redéployez/.test(st.detail), ' Worker sans la sonde détaillée : c est dit, pas caché', st.detail);
 
+/* ---------- 1 bis. Le secret a été tourné d'un seul côté (piège silencieux) ---------- */
+st = analyzePulse({ webhookCount: 5, pulseSecret: { suffix: 'FwCM' },
+  lastWebhook: { at: il_y_a(4), signatureOk: true, secretSuffix: '5njQ' } }, NOW);
+ok(st.secretRotated === true, 'suffixes différents = le secret du Worker a changé depuis la dernière délivrance');
+ok(/prochaine vente pay/.test(st.detail) && /CHARIOW_PULSE_SECRET/.test(st.detail),
+  'et la carte nomme la conséquence (vente payée, client jamais activé) et la réparation', st.detail.slice(-160));
+st = analyzePulse({ webhookCount: 5, pulseSecret: { suffix: 'FwCM' },
+  lastWebhook: { at: il_y_a(4), signatureOk: true, secretSuffix: 'FwCM' } }, NOW);
+ok(st.secretRotated === false, 'mêmes 4 caractères = rien à signaler');
+ok(!st.detail.includes('\u26a0'), 'et aucun avertissement inventé', st.detail);
+st = analyzePulse({ webhookCount: 5, lastWebhook: { at: il_y_a(4), signatureOk: true } }, NOW);
+ok(st.secretRotated === false, 'un Worker qui ne publie pas son secret ne fait pas crier au loup');
+st = analyzePulse(null, NOW);
+ok(st.secretRotated === false, 'serveur injoignable : pas de fausse alerte de secret non plus');
+
 /* ---------- 2. L'URL à coller chez Chariow vient du Worker, pas du dépôt ---------- */
 st = analyzePulse({ pulse: { url: 'https://nimporte-quoi.jerode.workers.dev/webhook', count: 1, secretSet: true } }, NOW);
 ok(st.url === 'https://nimporte-quoi.jerode.workers.dev/webhook', 'l’URL annoncée par le Worker gagne sur celle du code', st.url);

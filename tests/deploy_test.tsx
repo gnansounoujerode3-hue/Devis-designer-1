@@ -37,6 +37,20 @@ const configTs = read('src/lib/config.ts');
 const apiHost = (configTs.match(/AUTO_PAY_WORKER_URL\s*=\s*'https:\/\/([^/']+)'/) || [])[1] || '';
 const apiLabel = apiHost.split('.')[0];
 ok(!!apiHost, 'l’URL du Worker d’API est déclarée dans config.ts', apiHost);
+
+/* Les adresses de SECOURS : tolérées là où elles sont déclarées (config.ts) et expliquées (README),
+   jamais recopiées dans un composant — sinon le fichier a choisi un camp et le résolveur
+   (src/lib/workerBase.ts) ne décide plus de rien. Une liste vide est un état normal : le repli a
+   vocation à disparaître quand l'adresse principale est stable. */
+const fallbackBlock = (configTs.match(/AUTO_PAY_WORKER_FALLBACKS\s*=\s*\[([\s\S]*?)\]/) || [, ''])[1];
+const fallbackHosts = (fallbackBlock.match(/https:\/\/[^'/\s]+/g) || [])
+  .map(u => u.replace(/^https:\/\//, '').toLowerCase()).filter(h => h && h !== apiHost.toLowerCase());
+ok(Array.isArray(fallbackHosts), 'la liste des adresses de repli est déclarée dans config.ts');
+for (const f of ['index.html', 'src/components/VendorPage.tsx', 'tests/shim.js', 'src/lib/workerBase.ts',
+                'src/lib/quota.ts', 'src/components/PaywallModal.tsx', 'scripts/make-og-image.py', 'backend/worker.js']) {
+  const low = read(f).toLowerCase();
+  ok(!fallbackHosts.some(h => low.includes(h)), `${f} ne recopie aucune adresse de repli`, fallbackHosts.join(', '));
+}
 ok(cfg.name !== apiLabel, 'le front ne porte pas le même nom que le Worker d’API', `${cfg.name} / ${apiLabel}`);
 
 /* Vite doit bien écrire dans dist (sinon le Worker envoie un dossier vide). */
@@ -59,6 +73,7 @@ ok(!appUrl.includes('workers.dev') || appHost !== apiHost, 'le domaine du front 
 function staleHosts(f: string): string[] {
   const hosts = read(f).match(/(?:[a-z0-9-]+\.)+(?:workers\.dev|netlify\.app|pages\.dev|vercel\.app)/gi) || [];
   const wanted = new Set([appHost.toLowerCase(), apiHost.toLowerCase(), 'devisdesigner']);
+  if (/^src\/lib\/config\.ts$|^README\.md$/.test(f)) fallbackHosts.forEach(h => wanted.add(h));
   return Array.from(new Set(hosts.map(h => h.toLowerCase())))
     .filter(h => h.includes('devisdesigner') && !wanted.has(h));
 }

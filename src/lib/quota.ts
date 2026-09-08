@@ -23,11 +23,11 @@
    ============================================================ */
 
 import { FREE_EXPORT_LIMIT, getExportCount, isLicensed, loadLicense } from './license';
-import { AUTO_PAY_WORKER_URL, QUOTA_SERVER_ENFORCEMENT } from './config';
+import { QUOTA_SERVER_ENFORCEMENT } from './config';
+import { workerBase } from './workerBase';
 import { workerAdminKey } from './adminKey';
 import { getMyRefCode } from './referral';
 
-const WORKER_BASE = (AUTO_PAY_WORKER_URL || '').replace(/\/+$/, '');
 
 const LS_SERVER_STATE = 'dd_quota_server';
 
@@ -53,7 +53,7 @@ let cache: QuotaState | null = null;
 
 /** Le quota est-il piloté par le serveur ? */
 export function isServerQuotaEnabled(): boolean {
-  return QUOTA_SERVER_ENFORCEMENT && /^https?:\/\//i.test(WORKER_BASE);
+  return QUOTA_SERVER_ENFORCEMENT && /^https?:\/\//i.test(workerBase());
 }
 
 /** Dernier état connu du serveur de quota (pour l'affichage honnête dans l'UI). */
@@ -71,7 +71,7 @@ async function callWorker(path: string, body: Record<string, unknown>, timeoutMs
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(WORKER_BASE + path, {
+    const res = await fetch(workerBase() + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -97,7 +97,7 @@ async function callWorkerRaw(path: string, body: Record<string, unknown>, timeou
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(WORKER_BASE + path, {
+    const res = await fetch(workerBase() + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

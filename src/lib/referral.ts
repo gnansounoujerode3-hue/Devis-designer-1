@@ -29,7 +29,8 @@ import {
   REF_CODE_KEY, REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR,
   referralMonthsReceivedThisYear, referralMonthsRemaining, getReferralRewards,
 } from './license';
-import { VENDOR, AUTO_PAY_WORKER_URL, REFERRAL_VIA_WORKER } from './config';
+import { VENDOR, REFERRAL_VIA_WORKER } from './config';
+import { workerBase } from './workerBase';
 import { workerAdminKey } from './adminKey';
 
 export { REF_REWARD_MONTHS, REF_MAX_MONTHS_PER_YEAR };
@@ -92,11 +93,10 @@ export function isReferred(): boolean {
 
 /* ---------------- Worker (source de vérité du parrainage) ---------------- */
 
-const WORKER_BASE = (AUTO_PAY_WORKER_URL || '').replace(/\/+$/, '');
 
 /** Le parrainage est-il géré par le serveur ? */
 export function isWorkerReferralEnabled(): boolean {
-  return REFERRAL_VIA_WORKER && /^https?:\/\//i.test(WORKER_BASE);
+  return REFERRAL_VIA_WORKER && /^https?:\/\//i.test(workerBase());
 }
 
 export interface WorkerState { ok: boolean; at: number; }
@@ -120,7 +120,7 @@ async function callWorker(path: string, body: Record<string, unknown>, timeoutMs
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(WORKER_BASE + path, {
+    const res = await fetch(workerBase() + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

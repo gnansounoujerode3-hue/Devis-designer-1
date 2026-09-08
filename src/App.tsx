@@ -6,6 +6,7 @@ import FontPicker from './components/FontPicker';
 import SignatureModal from './components/SignatureModal';
 import { QuoteData, QuoteItem, CurrencyCode, CURRENCIES, formatMoney, DocStatus, STATUS_META, SavedClient, SavedEmitter, WATERMARK_LABEL } from './types';
 import { allTemplates, onDesignChange } from './templates';
+import { warmWorkerBase } from './lib/workerBase';
 import { createDefaultDoc, newItemRow, loadAllDocs, saveDoc, deleteDoc, duplicateDoc, convertToInvoice, loadClients, saveClient, deleteClient, getNextNumber, loadEmitters, saveEmitter, deleteEmitter, setDefaultEmitter, getDefaultEmitterId } from './store';
 import { buildSignatureHtml } from './lib/generateSignHtml';
 import PaywallModal from './components/PaywallModal';
@@ -142,7 +143,12 @@ export default function App() {
   const exportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); localStorage.setItem('devis_dark', dark ? '1' : '0'); }, [dark]);
-  useEffect(() => { setDocs(loadAllDocs()); setClients(loadClients()); setEmitters(loadEmitters()); setDefaultEmitterId(getDefaultEmitterId()); }, []);
+  useEffect(() => {
+    setDocs(loadAllDocs()); setClients(loadClients()); setEmitters(loadEmitters()); setDefaultEmitterId(getDefaultEmitterId());
+    // Laquelle des adresses du backend répond encore ? Un renommage de sous-domaine Cloudflare
+    // casse toutes les caisses en silence : on sonde une fois au démarrage, le choix tient 6 h.
+    void warmWorkerBase();
+  }, []);
   // Restaure le compteur d'exports depuis la sauvegarde IndexedDB (anti-reset)
   useEffect(() => {
     restoreExportCountFromBackup().then(() => { setLicenseTick(t => t + 1); return quotaRefresh(); })

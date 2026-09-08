@@ -43,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.3.2';
+export const APP_VERSION = '1.3.3';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'carte Pulse Chariow dans #/vendeur + adresse publique chez Cloudflare Workers (2026-09-08)';
+export const BUILD_TAG = 'caisse auto-réparante : adresses du Worker en liste + messages de panne en français (2026-09-08)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).
@@ -56,8 +56,17 @@ export const BUILD_TAG = 'carte Pulse Chariow dans #/vendeur + adresse publique 
    Voir README → « Paiement automatique ».
    Si vide : le flux manuel actuel (lien Chariow / Mobile Money +
    code généré dans l'espace vendeur) reste actif.
+   Le milieu de cette URL est le SOUS-DOMAINE DU COMPTE Cloudflare : renommé (Worker renommé,
+   ou passage sur un domaine à vous), l'adresse meurt d'un coup pour TOUTES les applications déjà
+   installées — et le client qui veut payer lit « Failed to fetch ». L'app entretient donc une
+   liste : elle sonde au démarrage et retient l'adresse qui répond (src/lib/workerBase.ts, cache
+   6 h en localStorage). Un repli ne coûte rien et évite une panne de caisse ; il n'a pas vocation
+   à durer : quand l'adresse principale est la bonne depuis quelques semaines, supprimez la ligne.
    ------------------------------------------------------------------ */
-export const AUTO_PAY_WORKER_URL = 'https://devisdesigner.gnansounoujerode3.workers.dev';
+export const AUTO_PAY_WORKER_URL = 'https://devisdesigner.jerode.workers.dev';
+export const AUTO_PAY_WORKER_FALLBACKS = [
+  'https://devisdesigner.gnansounoujerode3.workers.dev',   // ancien sous-domaine du compte
+];
 
 /* ------------------------------------------------------------------
    PARRAINAGE CÔTÉ SERVEUR (recommandé).

@@ -9,7 +9,7 @@
    chez Chariow), mais ça rend l'activation lente et dépendante du client qui
    laisse sa fenêtre ouverte. D'où une carte, plutôt qu'un doute.
    ============================================================ */
-import { AUTO_PAY_WORKER_URL } from './config';
+import { isWorkerConfigured, workerBase } from './workerBase';
 
 export type PulseVerdict = 'no-worker' | 'offline' | 'never' | 'rejected' | 'silent' | 'ok';
 
@@ -26,9 +26,11 @@ export interface PulseStatus {
   secretSet: boolean;
   /** false = le Worker déployé ne renvoie pas encore `debug.pulse` (sonde à redéployer). */
   probe: boolean;
+  /** Le secret du Worker n'est plus celui qui a vérifié la dernière délivrance : il a été changé. */
+  secretRotated: boolean;
 }
 
-const workerBase = () => (AUTO_PAY_WORKER_URL || '').replace(/\/+$/, '');
+// (l'adresse courante vient de workerBase(), résolveur partagé)
 
 const minutes = (iso: string, now: number): number => {
   const t = Date.parse(iso || '');
@@ -52,16 +54,30 @@ export function analyzePulse(debug: Record<string, unknown> | null | undefined, 
   const pending = p ? Number(p.pending ?? 0) || 0 : Array.isArray(debug?.pendingPayments) ? debug!.pendingPayments.length : 0;
   const mins = minutes(lastAt, now);
 
-  const mk = (verdict: PulseVerdict, titre: string, detail: string): PulseStatus =>
-    ({ verdict, titre, detail, url, count, lastAt, minutesSinceLast: mins, pending, secretSet, probe });
+  /* Piège réel, et silencieux : on tourne CHARIOW_PULSE_SECRET d'un côté sans le tourner de
+     l'autre. La dernière délivrance a été vérifiée avec un secret dont on ne garde que les 4
+     derniers caractères ; si ceux du Worker ont bougé depuis, la prochaine vente payée recevra
+     un 401 et le client aura payé sans jamais être activé. */
+  const cfgSuffix = String(((debug?.pulseSecret as Record<string, unknown> | undefined)?.suffix) || '');
+  const lastSuffix = String((last && last.secretSuffix) || '');
+  const secretRotated = !!cfgSuffix && !!lastSuffix && cfgSuffix !== lastSuffix;
+  const rotated = secretRotated
+    ? ' \u26a0 Le secret enregistr\u00e9 sur le Worker (…' + cfgSuffix + ') n\u2019est plus celui qui a v\u00e9rifi\u00e9 la derni\u00e8re d\u00e9livrance (…'
+      + lastSuffix + ') : vous l\u2019avez chang\u00e9. Si le Pulse c\u00f4t\u00e9 Chariow porte toujours l\u2019ancien, la prochaine vente pay\u00e9e '
+      + 'sera refus\u00e9e (signature invalide) et le client aura pay\u00e9 sans \u00eatre activ\u00e9. Collez le whsec_... affich\u00e9 par Chariow dans '
+      + 'CHARIOW_PULSE_SECRET et red\u00e9ployez le Worker.'
+    : '';
 
-  if (!base) {
+  const mk = (verdict: PulseVerdict, titre: string, detail: string): PulseStatus =>
+    ({ verdict, titre, detail: detail + (verdict === 'no-worker' || verdict === 'offline' ? '' : rotated), url, count, lastAt, minutesSinceLast: mins, pending, secretSet, probe, secretRotated });
+
+  if (!isWorkerConfigured()) {
     return mk('no-worker', 'Worker non configuré',
       'AUTO_PAY_WORKER_URL est vide dans src/lib/config.ts : aucune caisse automatique, donc aucun Pulse à attendre. Le paiement se fait au numéro du vendeur et vous générez le code vous-même.');
   }
   if (!debug) {
     return mk('offline', 'Serveur injoignable',
-      "Impossible de lire /debug du Worker. Vérifiez l'adresse déclarée dans AUTO_PAY_WORKER_URL et que le Worker est bien déployé. Si vous venez de renommer le sous-domaine du compte Cloudflare, c'est normal : l'adresse a changé, et celle enregistrée chez Chariow doit changer avec elle.");
+      "Impossible de lire /debug du Worker : aucune des adresses déclarées n'a répondu (AUTO_PAY_WORKER_URL et AUTO_PAY_WORKER_FALLBACKS dans src/lib/config.ts). Si vous venez de renommer le sous-domaine du compte Cloudflare, c'est normal : l'adresse a changé, et celle enregistrée chez Chariow doit changer avec elle.");
   }
   if (count === 0) {
     return mk('never', 'Aucun Pulse n’est jamais arrivé',

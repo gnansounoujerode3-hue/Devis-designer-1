@@ -240,7 +240,11 @@ devis-designer/
 │   ├── run.mjs         # Lanceur de suites (esbuild + shim DOM, sortie code 1 si échec)
 │   ├── shim.js         # localStorage/document/window minimaux pour rendre du React sous Node
 │   ├── design_test.tsx # Tout le trajet du design personnalisé (67 assertions)
-│   ├── landing_test.tsx# Vérité des copies de la page d'accueil (40 assertions)
+│   ├── pulse_test.tsx  # La sonde du Pulse Chariow, état par état (59 assertions)
+│   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (65 assertions)
+│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne (55 assertions)
+│   ├── emitter_test.tsx # Le carnet d'émetteurs (57 assertions)
+│   ├── landing_test.tsx# Vérité des copies de la page d'accueil (80 assertions)
 │   └── fixtures/       # Modèles de test (probe-a, probe-b, hooks) packés comme de vrais fichiers
 └── src/                # (designs/*.dddesign.js : artefacts livrés aux clients, hors Git)
     ├── main.tsx        # Bootstrap React
@@ -350,6 +354,11 @@ Client                Worker Cloudflare              Chariow
    deux côtés), `Silence depuis X min avec N paiement(s) en attente` (l'URL a bougé sous vos pieds).
    Équivalent en ligne de commande : `/debug` → `webhookCount`, `lastWebhook.action`,
    `pulse.pending`, `pulse.minutesSinceLast`.
+   La carte compare aussi les 4 derniers caractères du secret lu par le Worker (`pulseSecret.suffix`)
+   à ceux du secret qui a réellement vérifié la dernière délivrance (`lastWebhook.secretSuffix`).
+   Différents = vous avez tourné `CHARIOW_PULSE_SECRET` d'un seul côté : la prochaine vente payée
+   sera refusée pour signature invalide, l'argent rentrera, personne ne sera activé. C'est le genre
+   de panne qui ne laisse **aucune** trace à l'écran du client — d'où la comparaison.
 
 4. **Après un déménagement du Worker** (nouveau nom de Worker, sous-domaine de compte renommé,
    passage sur un domaine à vous) : **le Pulse ne suit pas tout seul.** Chariow continue de rappeler
@@ -358,6 +367,32 @@ Client                Worker Cloudflare              Chariow
    toutes les 15 s) et marque la vente payée. Mais ce filet ne joue que tant que le client garde la
    fenêtre de paiement ouverte — la vente `pending` expire au bout de 15 minutes. Donc : coller la
    nouvelle `webhookUrl` dans le Pulse Chariow **le jour même**, et vérifier le voyant.
+
+### Si un paiement échoue sous les yeux du client
+
+Le client, lui, ne voit jamais le Worker : il est déjà devant le guichet Mobile Money. Ce qu'il lit
+dans la fenêtre de paiement, et ce que vous faites :
+
+| Ce qui est écrit | Ce que ça veut dire | Ce que vous faites |
+| --- | --- | --- |
+| « Le serveur de paiement est injoignable depuis votre réseau » | aucune des adresses déclarées n'a répondu : Worker non déployé, sous-domaine renommé, ou connexion du client en rade | le client paie au numéro du vendeur et vous générez le code vous-même ; puis vous vérifiez `GET <url>/debug` de chez vous |
+| « La réponse du serveur de paiement est illisible » | l'adresse répond, mais pas en JSON — page d'erreur, domaine expiré, proxy qui sert autre chose | l'URL est mauvaise ou sert un autre site : corrigez `AUTO_PAY_WORKER_URL` |
+| carte Pulse « Aucun Pulse n'est jamais arrivé » alors que le client a payé | l'argent est entré chez Chariow, l'automation n'a pas suivi | voyez « Reprendre la main » ci-dessus ; si le client garde la fenêtre ouverte, `/check` finit par émettre le code |
+
+Aucun de ces messages n'est l'anglais technique de l'exception d'origine : une `fetch` qui échoue
+produit un `TypeError: Failed to fetch` **inintelligible**, et c'est exactement ce que voyait le
+client. `explainWorkerFailure()` (`src/lib/workerBase.ts`) traduit le symptôme en cause — réseau,
+adresse changée, réponse illisible — et la caisse bascule sur l'autre adresse déclarée.
+
+**Pourquoi l'app teste plusieurs adresses** (`src/lib/workerBase.ts`) : `AUTO_PAY_WORKER_URL` est
+gravée dans le fichier que chaque client a déjà téléchargé, alors qu'un renommage de sous-domaine
+Cloudflare est immédiat et silencieux. L'app sonde donc ses adresses une fois au démarrage
+(`GET /debug`, aucun envoi d'identité, résultat gardé 6 h dans `dd_worker_base`), retient celle qui
+répond, et bascule sur l'adresse de **repli** (`AUTO_PAY_WORKER_FALLBACKS`) si l'actuelle meurt — y
+compris au milieu d'un paiement. Une panne de nom de domaine ne doit pas devenir une panne de caisse.
+Quand l'adresse principale est la bonne depuis plusieurs semaines, supprimez le repli : deux adresses
+qui tournent, c'est deux adresses à surveiller.
+
 ### Endpoints du Worker
 
 | Route | Rôle |
@@ -400,9 +435,12 @@ Client                Worker Cloudflare              Chariow
      `PRODUCT_IDS` = `{"MONTHLY":"prd_...","ANNUAL":"prd_...","DESIGN":"prd_...","ALL":"prd_..."}`
    - Storage → KV : créez un namespace `DD_KV` et liez-le au Worker
 3. **L'application** : dans `src/lib/config.ts`, `AUTO_PAY_WORKER_URL` = l'adresse de **votre**
-   Worker (`https://<nom>.<sous-domaine-du-compte>.workers.dev`). Ce dépôt contient déjà l'adresse
-   du Worker déployé : lisez-la dans `src/lib/config.ts` au lieu de la reconstituer, et ne la
-   recopiez nulle part d'après mémoire — `GET <worker>/debug` → `webhookUrl` est la source sûre.
+   Worker (`https://<nom>.<sous-domaine-du-compte>.workers.dev`), et éventuellement
+   `AUTO_PAY_WORKER_FALLBACKS` = les adresses d'avant, gardées en secours. Ce dépôt contient déjà
+   l'adresse du Worker déployé : lisez-la dans `src/lib/config.ts` au lieu de la reconstituer, et ne
+   la recopiez nulle part d'après mémoire — `GET <worker>/debug` → `webhookUrl` est la source sûre.
+   L'app ne fige pas l'URL dans le marbre : elle sonde la liste au démarrage et suit celle qui
+   répond (voir « Si un paiement échoue sous les yeux du client »).
 
 Sécurité : la clé API Chariow ne vit que dans le Worker (jamais dans l'app),
 le webhook est vérifié par signature HMAC, chaque vente est reliée à
@@ -483,14 +521,14 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.2` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.3` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse dans /debug)` |
 | Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 303 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 383 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
@@ -539,9 +577,10 @@ l'affiche.
    (`python3 scripts/make-og-image.py`, sinon l'aperçu WhatsApp pointe l'ancienne adresse),
    `src/components/VendorPage.tsx` (le commentaire d'accès), `tests/shim.js`, `README.md`.
 3. Aucune retouche du Worker d'API, sauf si vous changez son nom : `AUTO_PAY_WORKER_URL` dans
-   `src/lib/config.ts` suffit, et l'adresse de retour de paiement est calculée sur
-   `window.location.origin`. Vérifiez en revanche dans l'espace Chariow qu'aucune URL de retour n'y
-   est enregistrée en dur avec l'ancien domaine.
+   `src/lib/config.ts` suffit (gardez l'ancienne adresse dans `AUTO_PAY_WORKER_FALLBACKS` pendant
+   quelques semaines : les installations déjà téléchargées continuent de l'appeler en secours), et
+   l'adresse de retour de paiement est calculée sur `window.location.origin`. Vérifiez en revanche
+   dans l'espace Chariow qu'aucune URL de retour n'y est enregistrée en dur avec l'ancien domaine.
 4. **Le point qui fâche : les données de vos utilisateurs.** Devis, clients, fiches émetteurs et
    signatures vivent dans le `localStorage` de **l'origine exacte**. Publier sous une nouvelle URL,
    c'est leur offrir un poste vide. Laissez donc l'ancienne adresse en ligne (ne pas supprimer le
@@ -566,8 +605,10 @@ Cloudflare>.workers.dev`. Le premier morceau vient de `wrangler.jsonc` (`"name"`
 
 1. **Le renommage déplace aussi l'API.** Votre Worker de quota s'appelle `devisdesigner`, il vit sur
    le même sous-domaine : le jour où vous passez de `gnansounoujerode3` à `jerode`, son adresse
-   change en même temps. Il faut donc, **le jour même**, corriger `AUTO_PAY_WORKER_URL` et
-   redéployer le front, sinon plus personne ne peut payer ni vérifier son quota :
+   change en même temps. Il faut donc, **le jour même**, corriger `AUTO_PAY_WORKER_URL` (en gardant
+   l'ancienne dans `AUTO_PAY_WORKER_FALLBACKS`), redéployer le front, et corriger l'URL du Pulse chez
+   Chariow — l'app sait se rattraper sur une adresse de secours, Chariow non. Sinon plus personne ne
+   peut payer ni vérifier son quota :
    ```bash
    ANCIEN=gnansounoujerode3        # le sous-domaine de compte d'avant
    NOUVEAU=jerode                 # celui que vous venez de choisir

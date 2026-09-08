@@ -4,7 +4,8 @@ import {
   LicenseState, loadLicense, getExportCount, applyCode,
   isLicensed, daysLeft,
 } from '../lib/license';
-import { VENDOR, CHARIOW_LINKS, createChariowPayment, AUTO_PAY_WORKER_URL } from '../lib/config';
+import { VENDOR, CHARIOW_LINKS, createChariowPayment } from '../lib/config';
+import { explainWorkerFailure, invalidateWorkerBase, isWorkerConfigured, warmWorkerBase, workerBase } from '../lib/workerBase';
 import { getMyRefCode } from '../lib/referral';
 import { quotaRefresh, type QuotaState } from '../lib/quota';
 import ReferralCard from './ReferralCard';
@@ -44,14 +45,13 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
      Si AUTO_PAY_WORKER_URL est configuré : le client paie, le Worker
      reçoit la confirmation Chariow (Pulse signé) et génère le code,
      l'application l'applique automatiquement. Sinon : flux manuel. */
-  const autoPay = !!AUTO_PAY_WORKER_URL;
+  const autoPay = isWorkerConfigured();
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '' });
   const [autoState, setAutoState] = useState<'idle' | 'starting' | 'openCheckout' | 'waiting' | 'activating' | 'done' | 'error'>('idle');
   const [autoMsg, setAutoMsg] = useState<string | null>(null);
   const [realStatus, setRealStatus] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const workerUrl = AUTO_PAY_WORKER_URL.replace(/\/+$/, '');
 
   const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   useEffect(() => { if (!open) { stopPolling(); setAutoState('idle'); setAutoMsg(null); setRealStatus(null); setCheckoutUrl(null); } }, [open]);
@@ -76,7 +76,7 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
     try { const r = localStorage.getItem('dd_last_purchase'); if (r) last = JSON.parse(r); } catch { last = null; }
     if (last && last.purchaseId && Date.now() - last.at < 20 * 60000) {
       const pid = last.purchaseId;
-      fetch(workerUrl + '/check', {
+      fetch(workerBase() + '/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ purchaseId: pid, deviceId: getMyRefCode() }),
@@ -98,6 +98,7 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
   const startPolling = (purchaseId: string) => {
     stopPolling();
     let tries = 0;
+    let netFails = 0;
     pollRef.current = setInterval(async () => {
       tries += 1;
       if (tries > 192) {
@@ -107,12 +108,13 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
         return;
       }
       try {
-        const res = await fetch(workerUrl + '/check', {
+        const res = await fetch(workerBase() + '/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ purchaseId, deviceId: getMyRefCode() }),
         });
         const data = await res.json();
+        netFails = 0;
         setRealStatus(data.realSaleStatus || null);
         if (data.ok && data.status === 'paid' && data.code) {
           stopPolling();
@@ -126,7 +128,17 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
             setAutoMsg((data.message || 'Le paiement n\'a pas abouti.') + ' Relancez le paiement.');
           }
         }
-      } catch { /* réseau indisponible : nouvelle tentative au prochain tick */ }
+      } catch (e) {
+        // Le client a payé, il attend : on continue de demander, mais on le dit. Trois échecs
+        // réseau d'affilée = l'adresse ne répond plus ; on la marque morte et on re-sonde la
+        // liste, sans quoi les 192 tentatives suivantes taperont toutes dans le vide.
+        netFails += 1;
+        if (netFails === 3 && (e instanceof TypeError || /failed to fetch|networkerror/i.test(String((e as Error | null)?.message || '')))) {
+          invalidateWorkerBase();
+          void warmWorkerBase(4000);
+          setAutoMsg('Impossible de joindre le serveur de paiement pour vérifier votre vente. Gardez cette fenêtre ouverte : la vérification reprend dès que la connexion revient, et votre paiement ne sera pas perdu.');
+        }
+      }
     }, 5000);
   };
 
@@ -140,7 +152,7 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
     setAutoMsg(null);
     const offerMap: Record<OfferId, string> = { monthly: 'MONTHLY', annual: 'ANNUAL', design: 'DESIGN', all: 'ALL' };
     try {
-      const res = await fetch(workerUrl + '/checkout', {
+      const res = await fetch(workerBase() + '/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,8 +161,14 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
           customer: { name: customer.name.trim(), email: customer.email.trim(), phone: phoneDigits },
         }),
       });
-      const data = await res.json();
-      if (!data.ok || (!data.checkout_url && !data.code)) throw new Error(data.message || 'Erreur de lancement du paiement.');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json().catch(() => null);
+      if (!data || typeof data !== 'object') throw new Error('Le serveur a répondu quelque chose de non lisible (pas de JSON).');
+      if (!data.ok || (!data.checkout_url && !data.code)) {
+        setAutoState('error');
+        setAutoMsg(String(data.message || 'Le paiement n’a pas pu être lancé.') + ' Vous pouvez réessayer, ou payer en secours : Mobile Money de ' + fmt(off.price) + ' au ' + VENDOR.PHONE + ', puis code d\u2019activation.');
+        return;
+      }
       if (data.status === 'paid' && data.code) { await activateCode(data.code); return; }
       try { localStorage.setItem('dd_last_purchase', JSON.stringify({ purchaseId: data.purchaseId, at: Date.now() })); } catch { /* ignore */ }
       // La page Orqex refuse de s'afficher dans un cadre (iframe de prévisualisation) :
@@ -161,7 +179,16 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
       startPolling(data.purchaseId);
     } catch (e) {
       setAutoState('error');
-      setAutoMsg((e instanceof Error ? e.message : String(e)) + ' — À titre de secours : paiement Mobile Money de ' + fmt(off.price) + ' au ' + VENDOR.PHONE + ', puis code d\u2019activation.');
+      // Une `fetch` qui échoue produit un `TypeError: Failed to fetch` — du jargon, devant un
+      // client qui a déjà son téléphone à la main. On traduit la panne en français, et on en
+      // tire la conséquence : cette adresse est morte, on cherche la suivante tout de suite
+      // (les clients qui ont téléchargé l'app avant un renommage de sous-domaine payaient
+      // une erreur, alors qu'une adresse de secours répondait à côté).
+      const down = e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String((e as Error | null)?.message || ''));
+      if (down) { invalidateWorkerBase(); void warmWorkerBase(4000); }
+      setAutoMsg(explainWorkerFailure(e)
+        + (down ? ' Réessayez : l’application vient de chercher une autre adresse du serveur de paiement.' : '')
+        + ' Le paiement reste possible, en secours : paiement Mobile Money de ' + fmt(off.price) + ' au ' + VENDOR.PHONE + ', puis code d\u2019activation.');
     }
   };
 

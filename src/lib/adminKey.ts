@@ -15,7 +15,7 @@
    lit le bundle ne le trouve pas.
    ============================================================ */
 
-import { AUTO_PAY_WORKER_URL } from './config';
+import { workerBase } from './workerBase';
 
 const LS_KEY = 'dd_worker_admin';
 
@@ -51,7 +51,7 @@ export interface KeyTest {
  * déploiement : « ok » = vous pouvez débloquer les clients depuis #/vendeur.
  */
 export async function testWorkerAdminKey(key = workerAdminKey()): Promise<KeyTest> {
-  const base = (AUTO_PAY_WORKER_URL || '').replace(/\/+$/, '');
+  const base = workerBase();
   if (!/^https?:\/\//i.test(base)) {
     return { ok: false, why: 'unconfigured', message: 'AUTO_PAY_WORKER_URL est vide dans src/lib/config.ts : l’app ne parle à aucun serveur.' };
   }
