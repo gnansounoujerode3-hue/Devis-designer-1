@@ -7,6 +7,24 @@
         des webhooks, et endpoint /debug pour le diagnostic.
    ============================================================ */
 
+/* ---------- Statut réel d'une vente chez Chariow ----------
+   Deux champs, pas un : `data.status` (la vente) et `data.payment.status` (le paiement).
+   Un client qui annule la demande Mobile Money sur son téléphone laisse la vente
+   `awaiting_payment` — Chariow ne la marque `abandoned` que plusieurs minutes plus tard, et
+   n'envoie aucun Pulse « annulation » (les événements sont successful/abandoned/failed).
+   Le seul signal immédiat est donc payment.status = cancelled. L'ignorer faisait afficher
+   « paiement en cours » à l'application pendant 16 minutes pour une vente déjà morte. */
+function saleOutcome(sale) {
+  const s = String((sale && sale.status) || '').toLowerCase();
+  const p = String(((sale && sale.payment) || {}).status || '').toLowerCase();
+  if (s === 'completed' || s === 'settled' || p === 'success') return { state: 'paid', why: null };
+  if (p === 'cancelled') return { state: 'cancelled', why: 'Vous avez annulé le paiement sur votre téléphone. Aucun montant n\u2019a été débité.' };
+  if (s === 'abandoned') return { state: 'failed', why: 'Chariow a marqué cette vente abandonnée : le paiement n\u2019est jamais arrivé jusqu\u2019à lui.' };
+  if (s === 'failed' || p === 'failed') return { state: 'failed', why: 'Le paiement a échoué chez l\u2019opérateur (solde insuffisant, code PIN erroné ou délai dépassé).' };
+  if (!s && !p) return { state: 'unknown', why: null };
+  return { state: 'waiting', why: null };   // awaiting_payment, initiated, pending
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -488,7 +506,7 @@ export default {
                   const r = await fetch('https://api.chariow.com/v1/sales/' + sid, { headers: { 'Authorization': 'Bearer ' + key } });
                   if (r.ok) {
                     const sd = await r.json();
-                    paid = !!(sd.data && (sd.data.status === 'completed' || sd.data.status === 'settled'));
+                    paid = saleOutcome(sd.data).state === 'paid';
                   }
                 } catch { paid = true; }
               }
@@ -547,28 +565,53 @@ export default {
         // Si toujours "pending", vérifier le statut RÉEL de la vente chez Chariow
         // (filet de sécurité si le Pulse/webhook ne passe pas) — max 1 appel API / 15 s
         let realStatus = null;
-        if (rec.status === 'pending' && rec.saleId) {
+        let payStatus = null;
+        // Une vente annulee est relue AUSSI, mais moins souvent : le client qui annule puis
+        // revient payer sur la meme page Chariow doit etre active, pas rester enterre.
+        const reopening = rec.status === 'failed' && !rec.delivered;
+        if ((rec.status === 'pending' || reopening) && rec.saleId) {
           const key = envGet(env, 'CHARIOW_KEY');
           const cached = await kvGet(env, 'salestatus:' + rec.saleId, null);
-          if (key && (!cached || Date.now() - cached.at > 15000)) {
+          const patience = reopening ? 60000 : 15000;
+          // Le cache porte aussi payment.status desormais : une entree plus ancienne (sans ce
+          // champ) serait inutilisable pour detecter une annulation, on relit donc Chariow.
+          if (key && (!cached || !cached.payment || Date.now() - cached.at > patience)) {
             try {
               const r = await fetch('https://api.chariow.com/v1/sales/' + rec.saleId, { headers: { 'Authorization': 'Bearer ' + key } });
               if (r.ok) {
                 const sd = await r.json();
-                realStatus = sd.data && sd.data.status;
-                await kvPut(env, 'salestatus:' + rec.saleId, { at: Date.now(), status: realStatus });
-                if (realStatus === 'completed' || realStatus === 'settled') {
+                const sale = (sd && sd.data) || null;
+                realStatus = sale && sale.status;
+                payStatus = (sale && sale.payment && sale.payment.status) || null;
+                await kvPut(env, 'salestatus:' + rec.saleId, { at: Date.now(), status: realStatus, payment: payStatus });
+                const oc = saleOutcome(sale);
+                if (oc.state === 'paid') {
                   rec.status = 'paid';
                   rec.paidAt = Date.now();
                   await kvPut(env, 'pay:' + purchaseId, rec);
-                } else if (realStatus === 'failed' || realStatus === 'abandoned') {
-                  rec.status = 'failed';
+                } else if (oc.state === 'cancelled' || oc.state === 'failed') {
+                  if (reopening) {
+                    // Deja annoncee perdue et toujours pas livree : on ne reecrit pas la
+                    // raison, on laisse juste la reponse dire « annule » tant que c'est vrai.
+                  } else {
+                    // Terminal, tout de suite : plus rien a attendre de ce cote-la.
+                    rec.status = 'failed';
+                    rec.cancelled = oc.state === 'cancelled';
+                    rec.endReason = oc.why;
+                    await kvPut(env, 'pay:' + purchaseId, rec);
+                  }
+                } else if (reopening) {
+                  // Annulation retractee (le client a fini par payer) : la vente repart vivante.
+                  rec.status = 'pending';
+                  delete rec.cancelled;
+                  delete rec.endReason;
                   await kvPut(env, 'pay:' + purchaseId, rec);
                 }
               }
             } catch { realStatus = 'erreur reseau'; }
           } else if (cached) {
             realStatus = cached.status;
+            payStatus = cached.payment || null;
           }
         }
         await kvPut(env, 'log:check', { at: new Date().toISOString(), purchaseId, status: rec.status, realSaleStatus: realStatus });
@@ -583,7 +626,17 @@ export default {
           rec.code = code;
           await kvPut(env, 'pay:' + purchaseId, rec);
         }
-        return json({ ok: true, status: rec.status, code: rec.code || null, realSaleStatus: realStatus }, 200, cors);
+        if (rec.status === 'failed') {
+          // Le client n'a pas a deviner : « annule » et « echoue » ne se rejouent pas de la meme facon.
+          return json({
+            ok: false,
+            status: rec.cancelled ? 'cancelled' : 'failed',
+            message: rec.endReason || 'Le paiement n\u2019a pas abouti.',
+            realSaleStatus: realStatus,
+            paymentStatus: payStatus,
+          }, 200, cors);
+        }
+        return json({ ok: true, status: rec.status, code: rec.code || null, realSaleStatus: realStatus, paymentStatus: payStatus }, 200, cors);
       }
 
       return json({ ok: false, message: 'Route inconnue.' }, 404, cors);

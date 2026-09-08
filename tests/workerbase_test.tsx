@@ -113,7 +113,7 @@ for (const f of ['src/lib/quota.ts', 'src/lib/referral.ts', 'src/lib/adminKey.ts
 }
 ok(!/WORKER_BASE/.test(read('src/lib/quota.ts')), 'quota.ts : l’ancienne constante de module a disparu');
 ok(/if \(down\) \{\s*invalidateWorkerBase\(\);/.test(read('src/components/PaywallModal.tsx'))
-  && /if \(netFails === 3/.test(read('src/components/PaywallModal.tsx')),
+  && /if \(net\.fails === 3/.test(read('src/components/PaywallModal.tsx')),
   'une panne réseau, au lancement comme en vérification, invalide le choix (le client réessaie sur l’autre adresse)');
 ok(/void warmWorkerBase\(\);/.test(read('src/App.tsx')), 'la sonde joue au démarrage de l’app');
 const paywall = read('src/components/PaywallModal.tsx');
@@ -124,7 +124,7 @@ ok(/await res\.json\(\)\.catch\(\(\) => null\)/.test(paywall), 'un corps non-JSO
 ok(/String\(data\.message \|\|/.test(paywall), 'la réponse du Worker (en français, écrite pour le client) passe telle quelle');
 ok((paywall.match(/void warmWorkerBase\(4000\);/g) || []).length === 2,
   'lancement ET vérification re-sondent la liste après une panne réseau', String((paywall.match(/void warmWorkerBase\(4000\);/g) || []).length));
-ok(/let netFails = 0;/.test(paywall) && /netFails === 3/.test(paywall), 'le polling compte les échecs réseau (silence de 16 min = puni)');
+ok(/const net = \{ fails: 0 \};/.test(paywall) && /net\.fails === 3/.test(paywall), 'le polling compte les échecs réseau (silence de 16 min = puni)');
 ok(/votre paiement ne sera pas perdu/.test(paywall), 'et le client qui a déjà payé est rassuré par écrit');
 ok(/const recent = Date\.now\(\) - \(last\.at \|\| 0\) < 20 \* 60000;/.test(paywall),
   'à la réouverture, la vente est relue quel que soit son âge (payé puis fenêtre fermée = activé)');

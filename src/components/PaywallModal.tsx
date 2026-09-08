@@ -47,14 +47,19 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
      l'application l'applique automatiquement. Sinon : flux manuel. */
   const autoPay = isWorkerConfigured();
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '' });
-  const [autoState, setAutoState] = useState<'idle' | 'starting' | 'openCheckout' | 'waiting' | 'activating' | 'done' | 'error'>('idle');
+  const [autoState, setAutoState] = useState<'idle' | 'starting' | 'openCheckout' | 'waiting' | 'activating' | 'done' | 'error' | 'cancelled'>('idle');
   const [autoMsg, setAutoMsg] = useState<string | null>(null);
   const [realStatus, setRealStatus] = useState<string | null>(null);
+  const [payStatus, setPayStatus] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTries = useRef(0);
+  const [activePurchase, setActivePurchase] = useState<string | null>(null);
 
   const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
-  useEffect(() => { if (!open) { stopPolling(); setAutoState('idle'); setAutoMsg(null); setRealStatus(null); setCheckoutUrl(null); } }, [open]);
+  useEffect(() => {
+    if (!open) { stopPolling(); setActivePurchase(null); setAutoState('idle'); setAutoMsg(null); setRealStatus(null); setPayStatus(null); setCheckoutUrl(null); }
+  }, [open]);
   useEffect(() => () => stopPolling(), []);
 
   /* À l'ouverture, on relit le serveur (un déblocage a pu être accordé entre-temps).
@@ -107,52 +112,84 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
     else { setAutoState('error'); setAutoMsg(r.message); }
   };
 
+  /* Un relevé de statut, une seule fois. Joué par le timer (5 s), par le retour du client
+     sur l'onglet, et par la réouverture de la fenêtre. La réponse du Worker distingue trois
+     fins : payé, annulé sur le téléphone, échoué chez l'opérateur — les deux dernières
+     arrêtent l'attente au lieu de la laisser tourner un quart d'heure. */
+  const checkOnce = async (purchaseId: string, net: { fails: number }) => {
+    try {
+      const res = await fetch(workerBase() + '/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ purchaseId, deviceId: getMyRefCode() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data || typeof data !== 'object') throw new Error('json');
+      net.fails = 0;
+      setRealStatus(data.realSaleStatus || null);
+      setPayStatus(data.paymentStatus || null);
+      if (data.status === 'cancelled') {
+        stopPolling();
+        setActivePurchase(null);
+        try { localStorage.removeItem('dd_last_purchase'); } catch { /* ignore */ }
+        setAutoState('cancelled');
+        setAutoMsg(String(data.message || 'Vous avez annulé le paiement sur votre téléphone.'));
+        return;
+      }
+      if (data.status === 'paid' && data.code) { stopPolling(); setActivePurchase(null); await activateCode(data.code); return; }
+      if (!data.ok || data.status === 'expired' || data.status === 'failed') {
+        stopPolling();
+        setActivePurchase(null);
+        setAutoState('error');
+        if (data.status === 'failed') {
+          setAutoMsg('Selon Chariow, ce paiement n\'a pas abouti (échec ou abandon du Mobile Money). Vérifiez votre solde Mobile Money : si les fonds ont été débités, contactez votre opérateur avec la référence du paiement. Sinon, relancez un nouveau paiement.');
+        } else {
+          setAutoMsg((data.message || 'Le paiement n\'a pas abouti.') + ' Relancez le paiement.');
+        }
+      }
+    } catch (e) {
+      // Le client a payé, il attend : on continue de demander, mais on le dit. Trois échecs
+      // réseau d'affilée = l'adresse ne répond plus ; on la marque morte et on re-sonde la
+      // liste, sans quoi les 192 tentatives suivantes taperaient toutes dans le vide.
+      net.fails += 1;
+      if (net.fails === 3 && (e instanceof TypeError || /failed to fetch|networkerror/i.test(String((e as Error | null)?.message || '')))) {
+        invalidateWorkerBase();
+        void warmWorkerBase(4000);
+        setAutoMsg('Impossible de joindre le serveur de paiement pour vérifier votre vente. Gardez cette fenêtre ouverte : la vérification reprend dès que la connexion revient, et votre paiement ne sera pas perdu.');
+      }
+    }
+  };
+
   const startPolling = (purchaseId: string) => {
     stopPolling();
-    let tries = 0;
-    let netFails = 0;
-    pollRef.current = setInterval(async () => {
-      tries += 1;
-      if (tries > 192) {
+    pollTries.current = 0;
+    setActivePurchase(purchaseId);
+    const net = { fails: 0 };
+    void checkOnce(purchaseId, net);
+    pollRef.current = setInterval(() => {
+      pollTries.current += 1;
+      if (pollTries.current > 192) {
         stopPolling();
+        setActivePurchase(null);
         setAutoState('error');
         setAutoMsg('Le paiement n\'a pas été confirmé après 16 minutes. Relancez le paiement ou contactez ' + VENDOR.PHONE + '.');
         return;
       }
-      try {
-        const res = await fetch(workerBase() + '/check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ purchaseId, deviceId: getMyRefCode() }),
-        });
-        const data = await res.json();
-        netFails = 0;
-        setRealStatus(data.realSaleStatus || null);
-        if (data.ok && data.status === 'paid' && data.code) {
-          stopPolling();
-          await activateCode(data.code);
-        } else if (!data.ok || data.status === 'expired' || data.status === 'failed') {
-          stopPolling();
-          setAutoState('error');
-          if (data.status === 'failed') {
-            setAutoMsg('Selon Chariow, ce paiement n\'a pas abouti (échec ou abandon du Mobile Money). Vérifiez votre solde Mobile Money : si les fonds ont été débités, contactez votre opérateur avec la référence du paiement. Sinon, relancez un nouveau paiement.');
-          } else {
-            setAutoMsg((data.message || 'Le paiement n\'a pas abouti.') + ' Relancez le paiement.');
-          }
-        }
-      } catch (e) {
-        // Le client a payé, il attend : on continue de demander, mais on le dit. Trois échecs
-        // réseau d'affilée = l'adresse ne répond plus ; on la marque morte et on re-sonde la
-        // liste, sans quoi les 192 tentatives suivantes taperont toutes dans le vide.
-        netFails += 1;
-        if (netFails === 3 && (e instanceof TypeError || /failed to fetch|networkerror/i.test(String((e as Error | null)?.message || '')))) {
-          invalidateWorkerBase();
-          void warmWorkerBase(4000);
-          setAutoMsg('Impossible de joindre le serveur de paiement pour vérifier votre vente. Gardez cette fenêtre ouverte : la vérification reprend dès que la connexion revient, et votre paiement ne sera pas perdu.');
-        }
-      }
+      void checkOnce(purchaseId, net);
     }, 5000);
   };
+
+  /* Le client revient de la page Chariow (il vient d'annuler, ou vient de taper son PIN) :
+     le statut est relu immédiatement, pas au prochain tick. */
+  useEffect(() => {
+    if (!activePurchase) return;
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    const net = { fails: 0 };
+    const onVisible = () => { if (!document.hidden) void checkOnce(activePurchase, net); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { document.removeEventListener('visibilitychange', onVisible); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePurchase]);
 
   const startAutoPay = async (off: (typeof OFFERS)[number]) => {
     const phoneDigits = customer.phone.replace(/\D/g, '');
@@ -320,6 +357,15 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
                   : 'Terminez le paiement Mobile Money. La confirmation Chariow arrive 1 à 5 minutes après le code sur le téléphone. Vous pouvez fermer cette fenêtre : en rouvrant PRO, la confirmation sera reprise et l\'offre activée automatiquement.'}
               </p>
               <div className="mt-3 h-1.5 rounded-full bg-[#E8E8FF] dark:bg-zinc-700 overflow-hidden"><div className="h-full w-1/3 rounded-full bg-[#0057FF] animate-pulse" /></div>
+              {payStatus && payStatus !== 'success' && (
+                <div className="text-[10px] text-[#999] mt-2">
+                  Paiement sur votre téléphone : <b className="text-[#111] dark:text-white">{payStatus === 'pending' || payStatus === 'initiated' ? 'en cours de validation chez votre opérateur' : payStatus}</b>
+                </div>
+              )}
+              <button onClick={() => { stopPolling(); setActivePurchase(null); try { localStorage.removeItem('dd_last_purchase'); } catch { /* ignore */ } setAutoState('cancelled'); setAutoMsg('Vous avez indiqué avoir annulé le paiement. Rien n\'a été débité : vous pouvez en relancer un autre quand vous voulez.'); }}
+                className="mt-3 text-[10px] font-black tracking-widest text-[#888] underline hover:text-[#111] dark:hover:text-white">
+                J\u2019AI ANNULÉ LE PAIEMENT
+              </button>
               {realStatus && (
                 <div className="text-[10px] text-[#999] mt-2">
                   Statut Chariow : <b className={realStatus === 'completed' || realStatus === 'settled' ? 'text-green-600 dark:text-green-400' : 'text-[#111] dark:text-white'}>{realStatus === 'awaiting_payment' ? 'en attente de paiement (normal, patientez)' : realStatus === 'completed' || realStatus === 'settled' ? 'PAIEMENT REÇU — activation…' : realStatus}</b>
@@ -337,6 +383,16 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
             <div className="rounded-xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/30 p-4 text-center">
               <div className="text-xs font-black tracking-widest text-green-700 dark:text-green-400 mb-1">PAIEMENT CONFIRMÉ — OFFRE ACTIVÉE</div>
               <p className="text-[11px] text-[#666] dark:text-zinc-300">{autoMsg}</p>
+            </div>
+          )}
+          {autoPay && autoState === 'cancelled' && (
+            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-center">
+              <div className="text-xs font-black tracking-widest text-amber-700 dark:text-amber-400 mb-1">PAIEMENT ANNULÉ</div>
+              <p className="text-[11px] text-[#666] dark:text-zinc-300 mb-3">{autoMsg}</p>
+              <button onClick={() => { setAutoState('idle'); setAutoMsg(null); setRealStatus(null); setPayStatus(null); setCheckoutUrl(null); }}
+                className="w-full py-2.5 rounded-xl border-2 border-[#0057FF] text-[#0057FF] text-xs font-black tracking-widest hover:bg-[#0057FF] hover:text-white">
+                RECOMMENCER LE PAIEMENT
+              </button>
             </div>
           )}
           {autoPay && autoState === 'error' && autoMsg && (

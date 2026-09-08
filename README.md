@@ -243,6 +243,7 @@ devis-designer/
 │   ├── pulse_test.tsx  # La sonde du Pulse Chariow, état par état (59 assertions)
 │   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (69 assertions)
 │   ├── deploy_test.tsx # Ce qui casse à la mise en ligne (55 assertions)
+│   ├── payment_test.tsx # Le Worker rejoué sous Node : annulation, code unique, Pulse (45 assertions)
 │   ├── emitter_test.tsx # Le carnet d'émetteurs (57 assertions)
 │   ├── landing_test.tsx# Vérité des copies de la page d'accueil (80 assertions)
 │   └── fixtures/       # Modèles de test (probe-a, probe-b, hooks) packés comme de vrais fichiers
@@ -400,6 +401,46 @@ compris au milieu d'un paiement. Une panne de nom de domaine ne doit pas devenir
 Quand l'adresse principale est la bonne depuis plusieurs semaines, supprimez le repli : deux adresses
 qui tournent, c'est deux adresses à surveiller.
 
+### Le client annule le paiement sur son téléphone
+
+Symptôme qui a été remonté : le client refuse la demande Mobile Money (ou sort du PIN), et
+l'application reste bloquée sur « EN ATTENTE DE CONFIRMATION DU PAIEMENT » pendant de longues
+minutes. Ce n'était pas un caprice de l'interface : **Chariow ne prévient personne**. Son Pulse
+n'envoie que trois événements de vente — `successful.sale`, `abandoned.sale`, `failed.sale` — et
+l'abandon n'est poussé que plusieurs minutes après. Pendant ce temps, la vente reste
+`awaiting_payment`.
+
+Le seul signal immédiat est ailleurs : `data.payment.status` passe à **`cancelled`** sur-le-champ
+(les valeurs possibles côté paiement sont `initiated`, `pending`, `cancelled`, `failed`, `success` ;
+côté vente : `awaiting_payment`, `completed`, `failed`, `abandoned`, `settled`). Le Worker juge donc
+les **deux** champs d'un seul coup (`saleOutcome()`, dans `backend/worker.js`) :
+
+| Ce que dit Chariow | Ce que fait le Worker | Ce que voit le client |
+| --- | --- | --- |
+| vente `awaiting_payment`, paiement `cancelled` | vente verrouillée en terminal, réponse `status: "cancelled"` | « PAIEMENT ANNULÉ — aucun montant n'a été débité », bouton **RECOMMENCER LE PAIEMENT** |
+| vente `awaiting_payment`, paiement `pending`/`initiated` | on attend (c'est l'état normal d'un PIN en cours de validation) | « en cours de validation chez votre opérateur », sans faux message d'échec |
+| vente `failed` / `abandoned`, ou paiement `failed` | vente verrouillée, réponse `status: "failed"` avec la cause | échec nommé (solde, PIN, délai) + numéro du vendeur en secours |
+| vente `completed`/`settled` ou paiement `success` | code émis **une seule fois**, journalisé | offre activée |
+
+Trois choses accompagnent cette détection, parce que le seul diagnostic du serveur ne suffit pas :
+
+- le client peut **l'annoncer lui-même** : bouton « J'AI ANNULÉ LE PAIEMENT » pendant l'attente, qui
+  arrête la vérification et vide la référence de vente (`dd_last_purchase`) ;
+- le **retour sur l'onglet** (le client sort de la page Chariow) relit le statut immédiatement, au
+  lieu d'attendre le prochain cycle de 5 secondes ;
+- une vente annulée ne **ressuscite pas** : la vérification suivante, celle du réveil de l'onglet
+  comme celle de la réouverture de la fenêtre, répond « annulé » et non « en cours ».
+
+Le garde-fou des 15 minutes (`pending` trop ancien → `expired`) reste en place pour les connexions
+coupées en plein milieu : il n'est plus la seule sortie possible. Et une vente annoncée annulée
+n'est pas enterrée : tant que son code n'a pas été livré, le Worker la relit une fois par minute, et
+si le client est finalement repassé sur la page Chariow payer, la vente redevient `paid` et le code
+sort — c'est le `payment.status` qui décide, jamais le souvenir de l'application. Tout ceci est joué par
+`tests/payment_test.tsx`, qui **importe le Worker** et rejoue `/check`, `/webhook` (vraie signature
+HMAC et fausse signature) et `/debug` contre un faux Chariow — l'annulation, l'absence de faux
+positif en cours de validation, l'unicité du code et l'anti-rejeu du Pulse sont des assertions, pas
+des intentions.
+
 ### Endpoints du Worker
 
 | Route | Rôle |
@@ -528,14 +569,14 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.4` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.5` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse dans /debug)` |
 | Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 387 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 432 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
