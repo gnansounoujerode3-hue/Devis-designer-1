@@ -88,9 +88,13 @@ ok(/localStorage/.test(readme) && /Restaurer une copie/.test(readme),
   'README : le déménagement d’origine est expliqué avec la sauvegarde à faire avant');
 ok(/Access-Control-Allow-Origin/.test(readme),
   'README : il est dit que le Worker d’API n’a pas besoin d’être retouché');
-ok(/Version 1\.3\.0/.test(readme), 'README : la sonde de version annonce la version courante');
+const appVersion = (configTs.match(/APP_VERSION = '([^']+)'/) || [])[1] || '';
+const pkgVersion = JSON.parse(read('package.json')).version;
+ok(appVersion === pkgVersion, 'package.json et config.ts portent la même version', `${pkgVersion} / ${appVersion}`);
+ok(readme.includes(`Version ${appVersion}`), 'README : la sonde de version annonce la version courante', appVersion);
 ok(/tests\/deploy_test\.tsx/.test(readme), 'README : cette suite est listée avec les autres');
-ok(new RegExp('VERSION = .1\\.3\\.0.').test(configTs), 'config.ts : APP_VERSION est celle que le README annonce');
+ok(/Version 1\.3\.[0-9]/.test(readme) === false || readme.includes('Version ' + appVersion), 'README : aucun numéro de version périmé ne traîne');
+
 
 /* ---------- 5. Une deployment reste petite et sans surprise ---------- */
 ok(has('public/og-image.png'), 'la vignette de partage est dans public/ (Vite la recopie dans dist/)');

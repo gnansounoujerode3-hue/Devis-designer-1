@@ -17,9 +17,11 @@ npm run preview    # prévisualiser le build
 ## Fonctionnalités
 
 - **Application web, sans installation — mais avec connexion** : un seul fichier `dist/index.html`,
-  servi par Netlify (pas de mode hors-ligne : sans réseau, la page ne se charge pas ; en revanche
-  les documents sont enregistrés sur l'appareil au fil de l'eau)
-  (`https://devisdesigner.netlify.app/`) ; ajoutable à l'écran d'accueil du téléphone
+  servi par **Cloudflare Workers** en fichiers statiques — l'adresse publique est la constante
+  `VENDOR.DOWNLOAD_LINK` (`https://devis-designer-app.gnansounoujerode3.workers.dev/`, voir « Option 5 ») ; l'adresse historique sur Netlify
+  reste en ligne le temps que chacun fasse la bascule, puisque c'est le nom de domaine qui garde les documents
+  d'un utilisateur. Pas de mode hors-ligne : sans réseau, la page ne se charge pas ; en revanche les
+  documents sont enregistrés sur l'appareil au fil de l'eau ; ajoutable à l'écran d'accueil du téléphone
 - **12 templates de devis/factures** personnalisables (couleurs, polices, logo, conditions)
 - **Édition directe** : toucher/cliquer un texte sur l'aperçu pour le modifier (n'importe quel texte)
 - **Signatures** manuscrites (émetteur + client), envoi pour signature
@@ -159,7 +161,7 @@ puis verdir.
 Un lien partagé n'affiche **aucun visuel** si la page ne déclare pas d'`og:image`.
 Trois règles, vérifiées par `npm run test:ui` :
 
-- l'URL est **absolue** (`https://devisdesigner.netlify.app/og-image.png`) et sur le même
+- l'URL est **absolue** (`https://devis-designer-app.gnansounoujerode3.workers.dev/og-image.png`) et sur le même
   domaine que `og:url` ;
 - le fichier est un **PNG raster** de **1200×630** (pas de SVG : les robots d'aperçu ne le
   lisent pas), sous 400 ko, et vit dans `public/` pour que Vite le recopie dans `dist/` ;
@@ -180,7 +182,7 @@ suit les proportions A4 réelles (794×1123). `index.html` porte les balises ; l
 accepte `--size`, `--logo`, `--note` (et `--note ""` pour retirer la ligne discrète).
 
 > **Après déploiement**, si WhatsApp affiche toujours l'ancien aperçu : il **met la vignette
-> en cache**. Renvoyez le lien avec un paramètre différent (`https://devisdesigner.netlify.app/?v=2`)
+> en cache**. Renvoyez le lien avec un paramètre différent (`https://devis-designer-app.gnansounoujerode3.workers.dev/?v=2`)
 > pour le forcer à re-scroller la page, ou attendez quelques heures.
 
 ## Page d'accueil publique (landing)
@@ -384,7 +386,7 @@ Page **réservée au vendeur** (vous), **invisible des utilisateurs** : aucune
 liaison dans l'application, accès uniquement via l'URL :
 
 ```
-https://devisdesigner.netlify.app/#/vendeur
+https://devis-designer-app.gnansounoujerode3.workers.dev/#/vendeur
 ```
 
 1. Saisissez le **PIN** (`VENDOR_PIN` dans `src/lib/config.ts` — par défaut `2468`, **à changer**).
@@ -422,7 +424,7 @@ npm run deploy
 ```
 Ou via le tableau de bord vercel.com : importez le dépôt, framework = Vite, build = `npm run build`, output = `dist`.
 
-### Option 2 — Netlify (gratuit) — votre cas : `devisdesigner.netlify.app`
+### Option 2 — Netlify (gratuit) — l'adresse historique, à ne pas supprimer pendant la transition
 Le dépôt ne contient **que les sources** (`dist/` n'est pas versionné) : il faut donc
 publier le build à chaque changement.
 
@@ -432,7 +434,9 @@ npm install
 npm run build                              # -> dist/index.html (fichier unique, ~1,4 Mo)
 npx netlify-cli deploy --prod --dir=dist    # 1re fois : demande une connexion Netlify
 ```
-Si le CLI demande sur quel site pousser : `npx netlify-cli link` → choisissez **devisdesigner**.
+Si le CLI demande sur quel site pousser : `npx netlify-cli link` → choisissez le site
+Netlify historique. **Redéployez-le après chaque changement de `VENDOR.DOWNLOAD_LINK`** : tant que
+l'ancienne adresse est en ligne, elle doit afficher le même message de transition que la nouvelle.
 
 **Méthode B — à la main** : glissez-déposez le **dossier `dist/`** sur
 <https://app.netlify.com/drop>. Sur un site déjà connecté à Git, laissez Netlify builder
@@ -442,13 +446,13 @@ Si le CLI demande sur quel site pousser : `npx netlify-cli link` → choisissez 
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.0` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.1` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-07 (quota + parrainage serveur + DESIGN = design + 1 mois d'exports)` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 247 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 248 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
@@ -636,7 +640,7 @@ un filigrane « Version d'essai » sur les PDF gratuits.
 ## 🔗 Lien public & lien de parrainage
 
 Tout part d'une seule constante, `VENDOR.DOWNLOAD_LINK` dans `src/lib/config.ts`
-(actuellement `https://devisdesigner.netlify.app/`) :
+(aujourd'hui `https://devis-designer-app.gnansounoujerode3.workers.dev/`) :
 
 - les boutons « Parrainer un ami sur WhatsApp » partagent **`…/?ref=DDREF-VOTRECODE`** ;
 - à l'arrivée, `App.tsx` lit `?ref=`, enregistre le code parrain du filleul et enlève

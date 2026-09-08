@@ -122,7 +122,7 @@ ok(!/\.tsx/.test(designClause), 'les CGU ne promettent pas d\u2019ex\u00e9cuter 
 const meta = (prop: string) => new RegExp(`(?:property|name)="${prop}" content="([^"]*)"`).exec(head)?.[1] || '';
 const og = meta('og:image');
 ok(/^https:\/\/\S+\.png$/.test(og), 'og:image est une URL absolue en .png', og);
-ok(!!og && new URL(og).origin === new URL(meta('og:url') || 'https://devisdesigner.netlify.app/').origin,
+ok(!!og && new URL(og).origin === new URL(meta('og:url') || 'https://devis-designer-app.gnansounoujerode3.workers.dev/').origin,
    'la vignette est servie sur le même domaine que le site', og + ' vs ' + meta('og:url'));
 const ogFile = 'public/' + (og ? new URL(og).pathname.replace(/^\//, '') : 'og-image.png');
 ok(existsSync(src(ogFile)), 'le fichier existe dans ' + ogFile + ' (Vite le recopie dans dist/)');

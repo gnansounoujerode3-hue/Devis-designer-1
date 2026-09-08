@@ -23,7 +23,7 @@ export const VENDOR = {
    * WhatsApp et dans les liens de parrainage (referralDownloadLink() y ajoute
    * ?ref=VOTRE_CODE). À changer si vous déménagez le site.
    */
-  DOWNLOAD_LINK: 'https://devisdesigner.netlify.app/',
+  DOWNLOAD_LINK: 'https://devis-designer-app.gnansounoujerode3.workers.dev/',
 };
 
 /**
@@ -43,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.3.1';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'carnet d\'émetteurs : la fiche du documentaire est enregistrée et pré-remplit chaque nouveau document (2026-09-08)';
+export const BUILD_TAG = 'carnet d\'émetteurs + adresse publique déplacée chez Cloudflare Workers (2026-09-08)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).
