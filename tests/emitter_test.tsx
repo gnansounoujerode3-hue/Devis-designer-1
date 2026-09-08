@@ -96,7 +96,7 @@ saveEmitter(fiche());
 saveEmitter(fiche({ id: 'B2', label: 'Agence Nord', name: 'Agence Nord' }));
 setDefaultEmitter('B2');
 const backup = exportAllData();
-ok(backup.version === 3 && Array.isArray(backup.emitters) && backup.emitters?.length === 2, 'version 3 : les fiches sont dans le fichier');
+ok(backup.version === 4 && Array.isArray(backup.emitters) && backup.emitters?.length === 2, 'version 4 : les fiches sont dans le fichier');
 ok(backup.emitterDefault === 'B2', 'le choix par défaut voyage aussi');
 localStorage.clear();
 ok(loadEmitters().length === 0, 'changement d\'appareil : carnet vide');
@@ -105,7 +105,8 @@ ok(back.ok === true, 'la copie se restaure');
 ok(/2 fiche\(s\) émetteur\(s\) restaurée\(s\)/.test(back.message), 'le message annonce les fiches restaurées', back.message);
 ok(loadEmitters().length === 2 && getDefaultEmitterId() === 'B2', 'carnet et choix reconstitués à l\'identique');
 ok(createDefaultDoc().designerName === 'Agence Nord', 'et les nouveaux documents sont de nouveau pré-remplis');
-/* fusion : une fiche du même nom ne crée pas de doublon, une autre s'ajoute */
+/* fusion : une fiche du même nom ne crée pas de doublon, une autre s'ajoute.
+   La copie est écrite en version 3 exprès : un fichier d'avant doit rester lisible. */
 const merged = importAllData(JSON.stringify({
   app: 'devis-designer', version: 3, docs: [], clients: [],
   emitters: [fiche({ id: 'ZZ', label: 'Atelier Koffi', name: 'Atelier Koffi' }), fiche({ id: 'E5', label: 'Autre atelier', name: 'Autre atelier', email: 'z@y.x' })],
@@ -130,7 +131,7 @@ ok(/Renseignez d.abord votre nom ou votre société/.test(app), 'sauvegarde refu
 const landing = flat('src/components/LandingPage.tsx');
 ok(/dupliquez le pr/.test(landing) === false, 'landing : le « dupliquez le précédent » n\'est plus la promesse');
 ok(/SAUVEGARDER CETTE FICHE/.test(landing), 'landing : l\'étape 1 renvoie au bouton qui existe vraiment');
-ok(/Votre en-t.te et les coordonn.es de vos clients reviennent d.un document . l.autre/.test(landing), 'landing : la fiche emetteur, elle aussi, est reuse et annoncee');
+ok(/Votre en-tête, vos clients et vos prestations reviennent/.test(landing), 'landing : la fiche emetteur (et le carnet de lignes) est annoncée comme réutilisée');
 
 const faq = flat('src/components/FAQModal.tsx');
 ok(/retaper mon nom et mon logo/.test(faq), 'FAQ : la question de l\'en-tête retapé a sa réponse');
@@ -139,7 +140,7 @@ ok(/fiches .metteurs/.test(faq) || /fiches .metteur/.test(faq), 'FAQ : la sauveg
 const readme = src('README.md');
 ok(/## Carnet d'émetteurs et fichier clients/.test(readme), 'README : une section dédiée au carnet des fiches émetteurs');
 ok(/devis_designer_emitters/.test(readme) && /devis_designer_emitter_default/.test(readme), 'README : les deux clés de stockage sont nommées');
-ok(/version: 3/.test(readme), 'README : la version de la sauvegarde est documentée');
+ok(/version: 4/.test(readme), 'README : la version de la sauvegarde est documentée');
 ok(/emitter_test\.tsx/.test(readme), 'README : la suite est citée là où elle protège');
 const pkg = JSON.parse(src('package.json'));
 ok(/emitter_test\.tsx/.test(pkg.scripts['test:ui'] || ''), 'package.json : la suite est jouée par npm run test:ui', pkg.scripts['test:ui']);

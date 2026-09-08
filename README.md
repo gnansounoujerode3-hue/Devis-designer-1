@@ -26,8 +26,10 @@ npm run preview    # prévisualiser le build
 - **Édition directe** : toucher/cliquer un texte sur l'aperçu pour le modifier (n'importe quel texte)
 - **Signatures** manuscrites (émetteur + client), envoi pour signature
 - **Export** : PDF (A4 multipages), SVG, présentation plein écran
+- **Carnet de prestations** : chaque ligne que vous enregistrez (intitulé + dernier tarif) est
+  retenue et repose d'un tap dans le devis suivant — voir « Carnet de prestations » plus bas
 - **Sauvegarde / restauration** JSON (export/import de tous les devis + clients + fiches
-  émetteurs, designs importés compris)
+  émetteurs + carnet de prestations, designs importés compris)
 - **Design personnalisé** : le vendeur livre un fichier `.dddesign.js`, le client l'importe ;
   jusqu'à 6 modèles importés coexistent chez lui. Voir plus bas « Design personnalisé
   (5 000 F) : fabriquer et livrer le fichier » et les suites `npm run test:ui`.
@@ -127,7 +129,8 @@ Quatre règles à connaître (suite `tests/emitter_test.tsx`) :
    `withLogo: false` — les coordonnées, elles, sont toujours sauvegardées, et l'interface dit
    précisément ce qui a été perdu plutôt que de promettre un enregistrement complet.
 
-Côté sauvegarde JSON : `BackupData` est en `version: 3` avec `emitters` et `emitterDefault`. Une copie
+Côté sauvegarde JSON : `BackupData` est en `version: 4` (v3 pour les fiches émetteurs, v4 depuis le
+carnet de prestations) avec `emitters`, `emitterDefault` et `services`. Une copie
 plus ancienne (qui ne contient pas la clé `emitters`) se restaure normalement et **laisse le carnet en
 place** : une clé absente se lit « rien à restaurer », jamais « zéro fiche » — sinon restaurer un vieux
 fichier effacerait l'en-tête enregistré depuis. À la restauration en mode
@@ -141,13 +144,59 @@ Restauration énonce le nombre de fiches, pour que personne ne croie avoir perdu
 npm run test:ui          # ou : npm test
 ```
 
-Cinq suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
+## Carnet de prestations : les lignes qui reviennent
+
+Un devis, c'est presque toujours les mêmes lignes. `src/store.ts` tient donc un troisième carnet,
+`SavedService`, dans la clé `devis_designer_services` :
+
+| Fonction | Rôle |
+| --- | --- |
+| `learnServices(items, docId)` | appelé par `saveDoc` à **chaque** enregistrement : ajoute les lignes nouvelles, met à jour le prix de celles déjà connues |
+| `rememberService(label, price, docId?)` | le bouton « ＋ MÉMORISER » d'une ligne (et le compteur d'usage) |
+| `loadServices()` / `deleteService(id)` | lecture triée (les plus facturées d'abord) et retrait d'une habitude |
+| `normServiceLabel` / `normalizeService` | la comparaison des intitulés et la remise à plat d'un stockage lu n'importe comment |
+| `ServicesPicker` / `ServiceStar` / `ServicesDatalist` | l'onglet **Prestations** : pastilles cliquables, étoile par ligne, autocomplétion `dd-services` des deux panneaux de saisie |
+
+Quatre règles, et chacune est jouée par `tests/services_test.tsx` :
+
+1. **Un intitulé = une entrée.** La comparaison ignore la casse et les espaces multiples
+   («  Charte graphique » et « charte  graphique » sont la même ligne) ; l'affichage, lui, garde
+   votre texte tel que saisi.
+2. **« Nouvelle prestation » n'est jamais mémorisé.** C'est le clavier qui écrit ça quand on ajoute
+   une ligne, pas votre métier ; un intitulé vide est traité de la même façon.
+3. **`uses` compte des documents, pas des sauvegardes automatiques.** L'autosave joue toutes les
+   3 secondes : sans le garde-fou `docs[]` (borné à 40 identifiants), la même ligne gagnerait un
+   point à chaque battement et le tri du carnet ne voudrait plus rien dire. Effet utile :
+   `learnServices` ne réécrit le stockage que si quelque chose a réellement changé.
+4. **Plafonné à `SERVICE_MAX` = 80, et sacrificiel.** Au-delà, les moins utilisées s'effacent ; si
+   `localStorage` refuse l'écriture (quota), le carnet échoue en silence — un tarif perdu vaut mieux
+   qu'un devis perdu. `loadServices` ne renvoie de toute façon jamais une entrée invalide : le
+   stockage du navigateur est un lieu public.
+
+Une ligne posée depuis le carnet remplit d'abord **la ligne vide** que vous étiez en train d'écrire
+(une description absente ou laissée à « Nouvelle prestation »), sinon elle ajoute une ligne en fin de
+tableau. Le compteur d'usage est incrémenté tout de suite, sans attendre l'autosave.
+
+**Prix et devise** : le carnet retient un *nombre*, pas une devise. Le tarif d'une pastille est donc
+celui posé pour la dernière fois, dans la devise du document de cette fois-là ; un artisan qui facture
+en XOF et en EUR ajuste le champ « PRIX UNIT. » du document, qui reste seul maître du montant imprimé.
+
+Côté sauvegarde JSON : `version: 4` ajoute `services`. Une copie plus ancienne (sans la clé) se
+restaure normalement et **laisse le carnet local en place** — et le dit : « Prestations du carnet
+conservées (cette copie est plus ancienne). », même discipline que pour les fiches émetteurs. En mode
+fusion, une ligne déjà connue garde son prix local (le poste où vous travaillez est considéré plus à
+jour) et voit son compteur relevé ; en mode remplacement, le carnet repart de la copie. Enfin, comme
+tout le reste, le carnet vit dans le `localStorage` de **l'origine exacte** : une nouvelle adresse
+publique = un poste vide, la copie JSON est le seul pont.
+
+Huit suites de garde-fous vivent dans `tests/`, exécutées par `tests/run.mjs` (esbuild emballe
 le TSX avec un shim DOM minimal — `tests/shim.js` — et laisse `react`/`react-dom` imports de
 `node_modules`, donc le harness rend avec le même React que l'app) :
 
 | Suite | Ce qu'elle tient |
 | --- | --- |
-| `tests/emitter_test.tsx` | La fiche de l'émetteur : pré-remplissage de tout nouveau document par la fiche par défaut (et victoire d'un en-tête explicite), mise à jour sur place au lieu d'un doublon, choix et report de la fiche par défaut, carnet vidé, repli de quota logo (`{ saved, withLogo }`) jusqu'à l'échec total, sauvegarde JSON `version: 3` (remplacement à l'identique, fusion dédupliquée, copie ancienne qui ne vide rien), et les textes réellement écrits à l'écran, dans la FAQ, sur la landing et dans ce README. |
+| `tests/services_test.tsx` | Le carnet de prestations : apprentissage à l'enregistrement (jamais de doublon, jamais le libellé par défaut), compteur d'usage par document et non par autosave, plafond `SERVICE_MAX`, écriture idempotente, robustesse à un stockage n'importe quoi, sauvegarde `version: 4` (fusion qui n'écrase pas un tarif local, copie d'avant qui ne vide rien), pose d'une ligne dans le premier emplacement vide, et les astérisques du mur de paiement. |
+| `tests/emitter_test.tsx` | La fiche de l'émetteur : pré-remplissage de tout nouveau document par la fiche par défaut (et victoire d'un en-tête explicite), mise à jour sur place au lieu d'un doublon, choix et report de la fiche par défaut, carnet vidé, repli de quota logo (`{ saved, withLogo }`) jusqu'à l'échec total, sauvegarde JSON (remplacement à l'identique, fusion dédupliquée, copie d'avant qui ne vide rien), et les textes réellement écrits à l'écran, dans la FAQ, sur la landing et dans ce README. |
 | `tests/pulse_test.tsx` | La sonde Pulse de l'espace vendeur : les cinq pannes du webhook Chariow se traduisent en cinq phrases distinctes (injoignable ≠ jamais-reçu ≠ signature refusée ≠ silence ≠ vivant), l'URL à coller chez Chariow est toujours celle annoncée par le Worker, `analyzePulse` ne plante sur aucun `debug` fabuleux (chaîne, date illisible, compteur non numérique), chaque verdict a sa couleur, et le Worker exporte bien `webhookUrl` + `pulse.*`. |
 | `tests/deploy_test.tsx` | L'hébergement : `wrangler.jsonc` est un Worker d'assets valide (dist, fallback SPA, aucun script, nom distinct de celui du Worker d'API) ; **un seul domaine public** dans `index.html`, `config.ts`, la landing, la page vendeur, le shim de test, la vignette et ce README ; les commandes annoncées (`deploy:cf`) existent ; le README dit la vérité sur Cloudflare et sur le déménagement d'origine (`localStorage`). |
 | `tests/design_test.tsx` | Tout le trajet du design sur mesure : pack du vendeur → fichier signé → refus des fichiers modifiés, tronqués, trop gros → import → **rendu par le vrai `QuoteSVG`** → emplacements 1 à 6 (ajout, remplacement, plafond, retrait) → sauvegarde JSON et restauration (avec blob falsifié) → code d'activation `DESIGN` → carte d'import dans les deux états. Les gabarits testés sont dans `tests/fixtures/`. |
@@ -244,6 +293,7 @@ devis-designer/
 │   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (69 assertions)
 │   ├── deploy_test.tsx # Ce qui casse à la mise en ligne (55 assertions)
 │   ├── payment_test.tsx # Le Worker rejoué sous Node : annulation, code unique, Pulse (45 assertions)
+│   ├── services_test.tsx # Le carnet de prestations et les astérisques du paiement (65 assertions)
 │   ├── emitter_test.tsx # Le carnet d'émetteurs (57 assertions)
 │   ├── landing_test.tsx# Vérité des copies de la page d'accueil (80 assertions)
 │   └── fixtures/       # Modèles de test (probe-a, probe-b, hooks) packés comme de vrais fichiers
@@ -569,14 +619,14 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 
 | Quoi | Où lire | Valeur attendue aujourd'hui |
 |---|---|---|
-| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.5` |
+| Le front (Netlify, puis Cloudflare) | pied de page `Devis Designer · Version X.Y.Z`, et `BUILD_TAG` dans l'en-tête de `#/vendeur` | `Version 1.3.6` |
 | Le backend (Worker) | <https://devisdesigner.gnansounoujerode3.workers.dev/debug> → champ `version` | `2026-09-08 (quota + parrainage + DESIGN + sonde Pulse dans /debug)` |
 | Le Pulse (Chariow → Worker) | même `/debug` → `webhookUrl`, `pulse.count`, `pulse.pending`, ou la carte `#/vendeur` | `webhookUrl` = l’adresse du Worker + `/webhook`, et `pulse.count > 0` |
 
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 432 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 497 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 

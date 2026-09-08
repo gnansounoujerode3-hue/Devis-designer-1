@@ -23,6 +23,10 @@ const FAQS: { q: string; a: string }[] = [
     a: `Vous payez, l'offre s'active avec votre code (et un mois d'exports illimités est ajouté par la même occasion). Ensuite, décrivez au vendeur ce que vous voulez (couleurs, logo, disposition) sur WhatsApp. Il prépare le modèle chez lui et vous envoie un fichier .dddesign.js. Vous ouvrez l'application, bouton « PRO » puis carte « Importer mon design », vous choisissez le fichier : il est vérifié (un fichier modifié est refusé), puis rangé sur votre appareil. Votre design apparaît alors dans l'onglet STYLE, comme un modèle — à vous seul, les autres utilisateurs ne le voient pas. Vous pouvez en importer jusqu'à 6 à la fois (bouton « Ajouter un autre design »), et en remplacer un sans perdre les devis déjà rédigés avec. Si vous changez de poste, la copie JSON que vous exportez l'emporte avec lui.`,
   },
   {
+    q: 'Mes prestations habituelles sont-elles gardées quelque part ?',
+    a: `Oui. L'application retient chaque ligne que vous enregistrez — intitulé et dernier prix unitaire — et vous les propose dans l'onglet PRESTATIONS, triées par fréquence : un tap sur « Création de logo — 3 propositions » remplit la ligne que vous étiez en train d'écrire (ou en ajoute une), tarif compris. Vous pouvez aussi mémoriser une ligne vous-même avec le bouton « ＋ MÉMORISER » posé sous sa description, et en retirer une avec la petite croix de sa pastille (on vous demande de confirmer). Le carnet vit sur votre appareil, comme le reste : la copie JSON que vous exportez l'emporte avec vous, donc changer de téléphone ne remet pas les tarifs à zéro. Il est plafonné à 80 lignes — au-delà, les moins facturées s'effacent d'elles-mêmes.`,
+  },
+  {
     q: 'Quels sont les prix ?',
     a: `La version gratuite donne 20 exports (PDF ou envoi pour signature) par appareil, sur une période glissante de 30 jours. Ensuite : abonnement mensuel 2 000 F, abonnement 1 an 15 000 F, design personnalisé 5 000 F (paiement unique, qui inclut 1 mois d'exports illimités), ou tous les designs pendant 1 an 50 000 F. La création de devis, elle, reste gratuite et illimitée.`,
   },

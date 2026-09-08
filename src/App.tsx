@@ -4,10 +4,11 @@ import { jsPDF } from 'jspdf';
 import QuoteSVG from './components/QuoteSVG';
 import FontPicker from './components/FontPicker';
 import SignatureModal from './components/SignatureModal';
-import { QuoteData, QuoteItem, CurrencyCode, CURRENCIES, formatMoney, DocStatus, STATUS_META, SavedClient, SavedEmitter, WATERMARK_LABEL } from './types';
+import { QuoteData, QuoteItem, CurrencyCode, CURRENCIES, formatMoney, DocStatus, STATUS_META, SavedClient, SavedEmitter, SavedService, WATERMARK_LABEL } from './types';
 import { allTemplates, onDesignChange } from './templates';
 import { warmWorkerBase } from './lib/workerBase';
-import { createDefaultDoc, newItemRow, loadAllDocs, saveDoc, deleteDoc, duplicateDoc, convertToInvoice, loadClients, saveClient, deleteClient, getNextNumber, loadEmitters, saveEmitter, deleteEmitter, setDefaultEmitter, getDefaultEmitterId } from './store';
+import { createDefaultDoc, newItemRow, loadAllDocs, saveDoc, deleteDoc, duplicateDoc, convertToInvoice, loadClients, saveClient, deleteClient, getNextNumber, loadEmitters, saveEmitter, deleteEmitter, setDefaultEmitter, getDefaultEmitterId, loadServices, rememberService } from './store';
+import { ServiceStar, ServicesDatalist, ServicesPicker } from './components/ServicesPicker';
 import { buildSignatureHtml } from './lib/generateSignHtml';
 import PaywallModal from './components/PaywallModal';
 import ReferralToast from './components/ReferralToast';
@@ -104,6 +105,8 @@ export default function App() {
   const [data, setData] = useState<QuoteData>(createDefaultDoc());
   const [docs, setDocs] = useState<QuoteData[]>([]);
   const [tab, setTab] = useState(0);
+  /* Le carnet de prestations : copie lue du stockage (la source reste `learnServices`, a chaque enregistrement). */
+  const [services, setServices] = useState<SavedService[]>(() => loadServices());
   const [exportOpen, setExportOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [clientBook, setClientBook] = useState(false);
@@ -208,6 +211,9 @@ export default function App() {
       .finally(() => setReferralTick(t => t + 1));
   }, []);
   useEffect(() => { if (page !== 'editor') return; const t = setInterval(() => { saveDoc(data); setDocs(loadAllDocs()); }, 3000); return () => clearInterval(t); }, [data, page]);
+  // Le carnet se relit quand on ouvre l'onglet « Prestations » : c'est le seul moment ou il sert,
+  // et l'autosave ne doit pas declencher un rendu toutes les 3 secondes pour autant.
+  useEffect(() => { if (page === 'editor' && tab === 3) setServices(loadServices()); }, [page, tab]);
   useEffect(() => { const h = (e: MouseEvent) => { if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
 
   const set = useCallback(<K extends keyof QuoteData>(k: K, v: QuoteData[K]) => {
@@ -219,6 +225,23 @@ export default function App() {
   }, []);
   const setItem = useCallback((id: string, f: keyof QuoteItem, v: string | number) => { setData(p => ({ ...p, items: p.items.map(i => i.id === id ? { ...i, [f]: f === 'quantity' || f === 'unitPrice' ? Number(v) || 0 : f === 'description' ? clampText(String(v), ITEM_DESC_MAX) : v } : i) })); }, []);
   const addItem = useCallback(() => setData(p => ({ ...p, items: [...p.items, newItemRow()] })), []);
+  /* Un tap sur une prestation du carnet la pose dans le devis : d'abord dans la ligne vide que
+     l'on etait en train de rediger (le cas frequent : on ouvre, on tape, on choisit), sinon en
+     fin de tableau. Le compteur d'usage est incremente tout de suite, sans attendre l'autosave. */
+  const applyService = useCallback((s: SavedService) => {
+    const isFree = (txt: string) => !String(txt || '').trim() || /^nouvelle prestation$/i.test(String(txt).trim());
+    setData(p => {
+      const i = p.items.findIndex(it => isFree(it.description));
+      if (i >= 0) {
+        const items = p.items.slice();
+        items[i] = { ...items[i], description: s.label, unitPrice: s.unitPrice };
+        return { ...p, items };
+      }
+      return { ...p, items: [...p.items, { ...newItemRow(), description: s.label, unitPrice: s.unitPrice }] };
+    });
+    rememberService(s.label, s.unitPrice, data.id);
+    setServices(loadServices());
+  }, [data.id]);
   const delItem = useCallback((id: string) => setData(p => ({ ...p, items: p.items.filter(i => i.id !== id) })), []);
 
   const openDoc = (doc: QuoteData) => { setData(doc); setTab(0); setPage('editor'); };
@@ -256,7 +279,7 @@ export default function App() {
   };
   const handleDelete = (id: string) => { deleteDoc(id); setDocs(loadAllDocs()); };
   const handleConvert = () => { const inv = convertToInvoice(data); setDocs(loadAllDocs()); openDoc(inv); };
-  const handleSave = () => { saveDoc(data); setDocs(loadAllDocs()); };
+  const handleSave = () => { saveDoc(data); setDocs(loadAllDocs()); setServices(loadServices()); };
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { if (typeof reader.result === 'string') set('designerLogo', reader.result); }; reader.readAsDataURL(file); };
   const handleSaveClient = () => { const c: SavedClient = { id: uid(), name: data.clientName, company: data.clientCompany, email: data.clientEmail, address: data.clientAddress }; saveClient(c); setClients(loadClients()); };
   const handleLoadClient = (c: SavedClient) => { setData(p => ({ ...p, clientName: c.name, clientCompany: c.company, clientEmail: c.email, clientAddress: c.address })); setClientBook(false); };
@@ -853,6 +876,9 @@ export default function App() {
               </button>
             ))}
           </div>
+          {/* Une seule liste d'autocompletion pour tout l'editeur : les deux panneaux de saisie
+              (onglet Prestations et tiroir mobile) pointent sur le meme `dd-services`. */}
+          <ServicesDatalist services={services} />
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* TAB 0 */}
             {tab === 0 && (<>
@@ -972,7 +998,9 @@ export default function App() {
             {/* TAB 3 */}
             {tab === 3 && (<>
               <Label text={'Lignes · ' + data.items.length} accent={data.accentColor} dark={dark} />
-              <div className="space-y-3">{data.items.map((item, idx) => (<div key={item.id} className={`rounded-xl border-2 p-4 space-y-3 group transition-colors ${dark ? 'border-zinc-700 hover:border-zinc-600 bg-zinc-800/30' : 'border-[#ECECEC] hover:border-[#DDD]'}`}><div className="flex items-center justify-between"><span className="text-[11px] font-black tracking-widest" style={{ color: data.accentColor }}>{String(idx + 1).padStart(2, '0')}</span>{data.items.length > 1 && <button onClick={() => delItem(item.id)} className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[10px] font-bold text-red-400 hover:text-red-600 tracking-wider">SUPPRIMER</button>}</div><input value={item.description} onChange={e => setItem(item.id, 'description', e.target.value)} placeholder="Description" className={`w-full px-3 py-2.5 text-sm rounded-lg focus:outline-none transition-colors ${dark ? 'bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} style={{ borderWidth: '2px' }} onFocus={e => (e.target.style.borderColor = data.accentColor)} onBlur={e => (e.target.style.borderColor = dark ? '#3f3f46' : '#ECECEC')} /><div className="grid grid-cols-2 gap-3"><div><label className={`text-[10px] font-bold tracking-wider mb-1 block ${dark ? 'text-zinc-500' : 'text-[#BBB]'}`}>QTE</label><NumInput min={1} value={item.quantity} onCommit={n => setItem(item.id, 'quantity', n)} className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none transition-colors ${dark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} style={{ borderWidth: '2px' }} onFocus={e => (e.target.style.borderColor = data.accentColor)} onBlur={e => (e.target.style.borderColor = dark ? '#3f3f46' : '#ECECEC')} /></div><div><label className={`text-[10px] font-bold tracking-wider mb-1 block ${dark ? 'text-zinc-500' : 'text-[#BBB]'}`}>PRIX UNIT. {curShort}</label><NumInput min={0} value={item.unitPrice} onCommit={n => setItem(item.id, 'unitPrice', n)} className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none transition-colors ${dark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} style={{ borderWidth: '2px' }} onFocus={e => (e.target.style.borderColor = data.accentColor)} onBlur={e => (e.target.style.borderColor = dark ? '#3f3f46' : '#ECECEC')} /></div></div><div className={`text-right text-xs font-bold ${dark ? 'text-zinc-400' : 'text-[#555]'}`}>= {fmt(item.quantity * item.unitPrice)}</div></div>))}</div>
+              <ServicesPicker services={services} curShort={curShort} dark={dark} accent={data.accentColor}
+                onPick={applyService} onChange={() => setServices(loadServices())} />
+              <div className="space-y-3">{data.items.map((item, idx) => (<div key={item.id} className={`rounded-xl border-2 p-4 space-y-3 group transition-colors ${dark ? 'border-zinc-700 hover:border-zinc-600 bg-zinc-800/30' : 'border-[#ECECEC] hover:border-[#DDD]'}`}><div className="flex items-center justify-between"><span className="text-[11px] font-black tracking-widest" style={{ color: data.accentColor }}>{String(idx + 1).padStart(2, '0')}</span>{data.items.length > 1 && <button onClick={() => delItem(item.id)} className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[10px] font-bold text-red-400 hover:text-red-600 tracking-wider">SUPPRIMER</button>}</div><input value={item.description} onChange={e => setItem(item.id, 'description', e.target.value)} placeholder="Description" list="dd-services" className={`w-full px-3 py-2.5 text-sm rounded-lg focus:outline-none transition-colors ${dark ? 'bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} style={{ borderWidth: '2px' }} onFocus={e => (e.target.style.borderColor = data.accentColor)} onBlur={e => (e.target.style.borderColor = dark ? '#3f3f46' : '#ECECEC')} /><ServiceStar label={item.description} unitPrice={item.unitPrice} services={services} dark={dark} accent={data.accentColor} onChange={() => setServices(loadServices())} /><div className="grid grid-cols-2 gap-3"><div><label className={`text-[10px] font-bold tracking-wider mb-1 block ${dark ? 'text-zinc-500' : 'text-[#BBB]'}`}>QTE</label><NumInput min={1} value={item.quantity} onCommit={n => setItem(item.id, 'quantity', n)} className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none transition-colors ${dark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} style={{ borderWidth: '2px' }} onFocus={e => (e.target.style.borderColor = data.accentColor)} onBlur={e => (e.target.style.borderColor = dark ? '#3f3f46' : '#ECECEC')} /></div><div><label className={`text-[10px] font-bold tracking-wider mb-1 block ${dark ? 'text-zinc-500' : 'text-[#BBB]'}`}>PRIX UNIT. {curShort}</label><NumInput min={0} value={item.unitPrice} onCommit={n => setItem(item.id, 'unitPrice', n)} className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none transition-colors ${dark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} style={{ borderWidth: '2px' }} onFocus={e => (e.target.style.borderColor = data.accentColor)} onBlur={e => (e.target.style.borderColor = dark ? '#3f3f46' : '#ECECEC')} /></div></div><div className={`text-right text-xs font-bold ${dark ? 'text-zinc-400' : 'text-[#555]'}`}>= {fmt(item.quantity * item.unitPrice)}</div></div>))}</div>
               <button onClick={addItem} className={`w-full h-12 rounded-xl border-2 border-dashed text-xs font-extrabold tracking-widest transition-all active:scale-[0.98] ${dark ? 'hover:bg-zinc-800' : 'hover:bg-[#FAFAFA]'}`} style={{ borderColor: data.accentColor + '50', color: data.accentColor }}>+ AJOUTER</button>
             </>)}
             {/* TAB 4 */}
@@ -1132,7 +1160,7 @@ export default function App() {
                         <span className="text-[9px] font-black tracking-widest text-[#999]">LIGNE {String(idx + 1).padStart(2, '0')}</span>
                         <button onClick={() => delItem(item.id)} className="text-[9px] font-bold text-red-400 hover:text-red-600 tracking-wider">SUPPRIMER</button>
                       </div>
-                      <input data-dd={"item:" + idx + ":description"} value={item.description} onChange={e => setItem(item.id, 'description', e.target.value)} placeholder="Description" className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none border-2 ${dark ? 'bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} />
+                      <input data-dd={"item:" + idx + ":description"} value={item.description} onChange={e => setItem(item.id, 'description', e.target.value)} placeholder="Description" list="dd-services" className={`w-full px-3 py-2 text-sm rounded-lg focus:outline-none border-2 ${dark ? 'bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500' : 'bg-[#FAFAFA] border-[#ECECEC] text-[#333]'}`} />
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className={`text-[9px] font-bold tracking-wider mb-1 block ${dark ? 'text-zinc-500' : 'text-[#BBB]'}`}>QTE</label>

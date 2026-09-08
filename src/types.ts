@@ -121,6 +121,26 @@ export interface SavedEmitter {
 }
 
 /**
+ * Une prestation mémorisée — l'équivalent du carnet de clients, pour les LIGNES du devis.
+ * Un artisan facture les dix mêmes choses : le carnet retient l'intitulé et le dernier prix
+ * unitaire posé, et compte les documents qui l'utilisent (jamais les sauvegardes automatiques :
+ * une même ligne enregistrée vingt fois reste une ligne d'un seul devis).
+ */
+export interface SavedService {
+  id: string;
+  /** Intitulé tel que saisi (coupé à 100 caractères, comme une ligne de devis). */
+  label: string;
+  /** Dernier prix unitaire posé pour cet intitulé, dans la devise du document. */
+  unitPrice: number;
+  /** ids des documents où cette ligne est apparue (borné : sert à compter, pas à archiver). */
+  docs: string[];
+  /** Nombre de documents différents qui l'ont portée — c'est ce qui trie le carnet. */
+  uses: number;
+  /** Dernier contact (epoch ms), pour départager deux prestations aussi fréquentes. */
+  lastAt: number;
+}
+
+/**
  * Les 12 modèles embarqués, plus les designs sur mesure importés par le client :
  * « custom » = 1er emplacement (nom historique), « custom-2 » … « custom-6 » ensuite.
  */

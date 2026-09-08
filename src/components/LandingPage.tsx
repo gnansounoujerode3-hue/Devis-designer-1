@@ -184,7 +184,7 @@ export default function LandingPage() {
     { i: 'grid', t: `${TEMPLATES.length} modèles mis en page`, d: 'Chaque modèle est une mise en page complète (en-tête, tableau, totaux, conditions), pas un simple habillage. La couleur d’accent et la police se changent à tout moment.' },
     { i: 'pen', t: 'Signature en ligne', d: 'Le client signe avec le doigt ou la souris sur le document, ou vous joignez l’image de votre cachet. La date de signature est inscrite sur le PDF.' },
     { i: 'export', t: 'PDF A4, SVG ou présentation', d: "Export PDF multi-pages prêt à envoyer, SVG vectoriel à confier à l'imprimeur, ou présentation plein écran du devis chez le client." },
-    { i: 'users', t: 'Vos fiches enregistrées', d: 'Votre en-tête et les coordonnées de vos clients reviennent d’un document à l’autre : plus rien à retaper pour une relance ou une facture.' },
+    { i: 'users', t: 'Vos fiches et vos lignes habituelles', d: 'Votre en-tête, vos clients et vos prestations reviennent d’un document à l’autre : le carnet garde chaque ligne avec son dernier tarif, un tap la repose dans le devis.' },
     { i: 'percent', t: 'TVA et multi-devises', d: 'Taux de taxe paramétrable, conditions et notes libres imprimées sous le tableau, montants en franc CFA, en euros ou en dollars.' },
     { i: 'device', t: 'Sauvegarde sur l’appareil', d: 'Tout ce que vous saisissez est enregistré dans le navigateur — automatiquement, toutes les quelques secondes — et vous pouvez exporter une copie JSON à réimporter plus tard sur un autre appareil.' },
     { i: 'cursor', t: 'Édition directe sur le document', d: "Activez l'édition directe et tapez directement sur l'aperçu : chaque texte du devis est modifiable là où il se lit, sans chercher le bon champ dans le panneau." },
@@ -269,7 +269,6 @@ export default function LandingPage() {
             <div className="flex flex-wrap gap-2 mb-6">
               <Chip dark={dark}>{FREE_EXPORT_LIMIT} exports offerts</Chip>
               <Chip dark={dark} tone="neutral">Aucune installation</Chip>
-              <Chip dark={dark} tone="green">Paiement Mobile Money en ligne</Chip>
             </div>
             <h1 className={`text-[34px] sm:text-[52px] font-extrabold tracking-[-0.02em] leading-[1.05] ${ink}`}>
               Vos devis et vos factures <span style={{ color: ACCENT }}>aussi soignés</span> que votre travail.

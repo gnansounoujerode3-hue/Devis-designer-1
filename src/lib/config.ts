@@ -43,9 +43,9 @@ export const VENDOR_PIN = '2468';
    qui affiche encore l'ancienne version = ancien bundle en cache ou
    dossier mal envoyé.
    ------------------------------------------------------------------ */
-export const APP_VERSION = '1.3.5';
+export const APP_VERSION = '1.3.6';
 /** Marque de build, visible uniquement dans l'espace vendeur. */
-export const BUILD_TAG = 'annulation Mobile Money détectée payment.status → fin immédiate du « paiement en cours » (2026-09-08)';
+export const BUILD_TAG = 'carnet de prestations (lignes réutilisées + tarifs) et astérisques du mur de paiement (2026-09-08)';
 
 /* ------------------------------------------------------------------
    PAIEMENT AUTOMATIQUE (optionnel).

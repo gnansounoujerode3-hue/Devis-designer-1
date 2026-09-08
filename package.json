@@ -1,7 +1,7 @@
 {
   "name": "devis-designer",
   "private": true,
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "Devis Designer — Générateur de devis et factures professionnels (application web)",
   "author": "Votre Nom",
   "type": "module",
@@ -12,7 +12,7 @@
     "deploy": "vite build && npx vercel --prod",
     "deploy:cf": "vite build && npx wrangler deploy",
     "design:pack": "esbuild scripts/design-pack.ts --bundle --platform=node --format=cjs --external:esbuild --outfile=node_modules/.dd/design-pack.cjs --log-level=warning && node node_modules/.dd/design-pack.cjs",
-    "test:ui": "node tests/run.mjs tests/design_test.tsx tests/landing_test.tsx tests/emitter_test.tsx tests/deploy_test.tsx tests/workerbase_test.tsx tests/payment_test.tsx tests/pulse_test.tsx",
+    "test:ui": "node tests/run.mjs tests/design_test.tsx tests/landing_test.tsx tests/emitter_test.tsx tests/deploy_test.tsx tests/workerbase_test.tsx tests/payment_test.tsx tests/services_test.tsx tests/pulse_test.tsx",
     "test": "npm run test:ui"
   },
   "dependencies": {

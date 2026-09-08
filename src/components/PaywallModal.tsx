@@ -47,6 +47,20 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
      l'application l'applique automatiquement. Sinon : flux manuel. */
   const autoPay = isWorkerConfigured();
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '' });
+  /* Chariow exige nom + numéro + email. Un client qui appuie sur PAYER sans les remplir ne
+     comprenait rien : le message d'erreur arrivait après coup, et les champs restaient neutres.
+     `tried` allume donc le marqueur * sur ce qui manque précisément (et seulement après le
+     premier essai : marquer un champ vierge d'un astérisque rouge avant même qu'il ait tapé
+     est une pression inutile). */
+  const [tried, setTried] = useState(false);
+  const missing = {
+    name: !customer.name.trim(),
+    phone: customer.phone.replace(/\D/g, '').length < 8,
+    email: !customer.email.trim(),
+  };
+  const custOk = !missing.name && !missing.phone && !missing.email;
+  const fieldCls = (bad: boolean) => 'px-3 py-2.5 text-sm rounded-lg border focus:outline-none '
+    + (bad ? 'border-red-400 bg-red-50/40 dark:bg-red-950/20' : 'border-[#E0E0E0] dark:border-zinc-700 dark:bg-zinc-900 dark:text-white focus:border-[#0057FF]');
   const [autoState, setAutoState] = useState<'idle' | 'starting' | 'openCheckout' | 'waiting' | 'activating' | 'done' | 'error' | 'cancelled'>('idle');
   const [autoMsg, setAutoMsg] = useState<string | null>(null);
   const [realStatus, setRealStatus] = useState<string | null>(null);
@@ -193,10 +207,22 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
 
   const startAutoPay = async (off: (typeof OFFERS)[number]) => {
     const phoneDigits = customer.phone.replace(/\D/g, '');
-    if (!customer.name.trim() || !customer.email.trim() || phoneDigits.length < 8) {
-      setAutoMsg('Renseignez votre nom, votre numéro Mobile Money et votre email, puis relancez le paiement.');
+    if (!custOk) {
+      setTried(true);
+      const manquants = [
+        missing.name && 'votre nom',
+        missing.phone && 'votre numéro Mobile Money (8 chiffres minimum)',
+        missing.email && 'votre email',
+      ].filter(Boolean).join(', ');
+      setAutoState('error');
+      setAutoMsg('Il manque ' + manquants + '. Les champs marqués * sont obligatoires : ils servent à encaisser le paiement et à vous renvoyer la facture.');
+      if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+        const id = missing.name ? 'dd-pay-name' : missing.phone ? 'dd-pay-phone' : 'dd-pay-email';
+        try { (document.getElementById(id) as HTMLInputElement | null)?.focus(); } catch { /* rendu sans DOM */ }
+      }
       return;
     }
+    setTried(false);
     setAutoState('starting');
     setAutoMsg(null);
     const offerMap: Record<OfferId, string> = { monthly: 'MONTHLY', annual: 'ANNUAL', design: 'DESIGN', all: 'ALL' };
@@ -240,6 +266,10 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
         + ' Le paiement reste possible, en secours : paiement Mobile Money de ' + fmt(off.price) + ' au ' + VENDOR.PHONE + ', puis code d\u2019activation.');
     }
   };
+
+  // Le marqueur des offres : identique pour les trois, jamais un « désactivé » muet —
+  // cliquer reste le moyen le plus sûr de savoir quoi remplir.
+  const payMark = autoPay && tried && !custOk;
 
   if (!open) return null;
 
@@ -297,14 +327,24 @@ export default function PaywallModal({ open, onClose, blocked, quota, onQuotaCha
               <div className="text-xs font-black tracking-widest text-[#111] dark:text-white mb-1">PAIEMENT AUTOMATIQUE</div>
               <p className="text-[11px] text-[#888] mb-3">
                 Payez par Mobile Money : votre offre sera activée <b>automatiquement</b>, sans code à saisir.
+                <span className={`block mt-1 ${payMark ? 'text-red-500 font-bold' : ''}`}>Les trois champs marqués <b className="text-red-500">*</b> sont obligatoires — la caisse en ligne ne peut pas vous identifier sans eux.</span>
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <input value={customer.name} onChange={e => setCustomer(c => ({ ...c, name: e.target.value }))} placeholder="Votre nom complet"
-                  className="px-3 py-2.5 text-sm rounded-lg border border-[#E0E0E0] dark:border-zinc-700 dark:bg-zinc-900 dark:text-white focus:outline-none focus:border-[#0057FF]" />
-                <input value={customer.phone} onChange={e => setCustomer(c => ({ ...c, phone: e.target.value }))} placeholder="N° Mobile Money (01...)" inputMode="tel"
-                  className="px-3 py-2.5 text-sm rounded-lg border border-[#E0E0E0] dark:border-zinc-700 dark:bg-zinc-900 dark:text-white focus:outline-none focus:border-[#0057FF]" />
-                <input value={customer.email} onChange={e => setCustomer(c => ({ ...c, email: e.target.value }))} placeholder="Votre email" inputMode="email"
-                  className="px-3 py-2.5 text-sm rounded-lg border border-[#E0E0E0] dark:border-zinc-700 dark:bg-zinc-900 dark:text-white focus:outline-none focus:border-[#0057FF]" />
+                {([
+                  ['name', 'dd-pay-name', 'Votre nom complet', 'text', 'Nom *'],
+                  ['phone', 'dd-pay-phone', 'N° Mobile Money (01...)', 'tel', 'N° Mobile Money *'],
+                  ['email', 'dd-pay-email', 'Votre email', 'email', 'Email *'],
+                ] as const).map(([key, id, ph, mode, lab]) => (
+                  <label key={key} className="block">
+                    <span className={`block text-[10px] font-black tracking-widest mb-1 ${tried && missing[key] ? 'text-red-500' : 'text-[#999]'}`}>
+                      {lab.slice(0, -2)}<b className="text-red-500"> *</b>
+                    </span>
+                    <input id={id} value={customer[key]} onChange={e => setCustomer(c => ({ ...c, [key]: e.target.value }))}
+                      placeholder={ph} inputMode={mode === 'text' ? 'text' : mode}
+                      required aria-required="true" aria-invalid={tried && missing[key] ? true : undefined}
+                      className={fieldCls(tried && missing[key])} />
+                  </label>
+                ))}
               </div>
             </div>
           )}
