@@ -9,7 +9,7 @@ mises à jour automatiques. Le site présente deux vues : une **page d'accueil p
 
 ```bash
 npm install        # installer les dépendances
-npm test           # 8 suites, 508 assertions, tout ce qui casse en silence
+npm test           # 8 suites, 511 assertions, tout ce qui casse en silence
 npm run build      # build de production (fichier unique dist/index.html)
 npm run preview    # prévisualiser le build (localhost seulement)
 npm run dev        # serveur de développement (http://localhost:5173)
@@ -303,7 +303,7 @@ devis-designer/
 │   ├── design_test.tsx # Tout le trajet du design personnalisé (67 assertions)
 │   ├── pulse_test.tsx  # La sonde du Pulse Chariow, état par état (59 assertions)
 │   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (69 assertions)
-│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne, y compris les commandes et les pins (62 assertions)
+│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne, y compris les commandes et les pins (65 assertions)
 │   ├── payment_test.tsx # Le Worker rejoué sous Node : annulation, code unique, Pulse (45 assertions)
 │   ├── services_test.tsx # Le carnet de prestations et les astérisques du paiement (65 assertions)
 │   ├── emitter_test.tsx # Le carnet d'émetteurs, la numérotation et le callback (61 assertions)
@@ -614,7 +614,9 @@ Il peut être hébergé **n'importe où** :
 ```bash
 npm run deploy:vercel
 ```
-Ou via le tableau de bord vercel.com : importez le dépôt, framework = Vercel, build = `npm run build`, output = `dist`.
+Ou via le tableau de bord vercel.com : importez le dépôt, framework = **Vite**, build = `npm run build`,
+output = `dist` — c'est exactement ce que déclare déjà `vercel.json` à la racine (avec une `rewrite` vers
+`/index.html`, utile seulement si un jour vous quittez le routage en hash).
 
 C'est **le mauvais bouton pour publier aujourd'hui** : le domaine que les liens de parrainage, les CGU et la
 FAQ citent est l'option 5 (un Worker d'assets Cloudflare). Le piège était dans `package.json` — le script
@@ -651,7 +653,7 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 508 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 511 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 

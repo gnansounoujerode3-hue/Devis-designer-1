@@ -7,7 +7,7 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"   # Vite 7 exige ^20.19 || >=22.12 ; aligné sur la commande GH Pages du README
 
 [[redirects]]
   from = "/*"

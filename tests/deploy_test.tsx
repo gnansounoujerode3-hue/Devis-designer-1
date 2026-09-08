@@ -119,6 +119,15 @@ const atLeast = (raw: string, min: number[]) => {
 ok(atLeast(pkg.devDependencies?.vite, [7, 3, 6]), 'package.json : vite à la version qui ferme les trous Windows du serveur de dev', pkg.devDependencies?.vite);
 ok(atLeast(pkg.devDependencies?.esbuild, [0, 28, 2]), 'package.json : esbuild idem', pkg.devDependencies?.esbuild);
 ok(/deploy_test\.tsx/.test(pkg.scripts['test:ui'] || ''), 'npm run test:ui joue cette suite', pkg.scripts['test:ui']);
+// Une commande que la doc cite et qui n'existe pas = quelqu'un qui échoue en collant le texte.
+// Le contrôle est mécanique : tout « npm run X » écrit dans le README doit être un script déclaré.
+const cited = new Set<string>();
+const reRun = /npm run ([a-zA-Z][a-zA-Z0-9:_-]*)/g;
+let mm: RegExpExecArray | null;
+while ((mm = reRun.exec(read('README.md')))) cited.add(mm[1]);
+const inconnus = [...cited].filter((name) => !(pkg.scripts as Record<string, string>)[name]);
+ok(inconnus.length === 0, 'README : chaque « npm run … » cité est un script qui existe', inconnus.join(', '));
+ok(/NODE_VERSION = "22"/.test(read('netlify.toml')), 'netlify.toml : Node 22, comme la voie Cloudflare Pages (Vite 7 exige >=20.19)');
 ok(read('wrangler.jsonc').includes('npm run deploy:cf'), 'wrangler.jsonc rappelle la commande');
 
 /* ---------- 4. Le README dit la vérité sur l'option Cloudflare ---------- */
@@ -126,6 +135,7 @@ const readme = read('README.md');
 ok(/### Option 5 — Cloudflare/.test(readme), 'README : l’option Cloudflare est écrite à côté des quatre autres');
 ok(readme.includes('npm run deploy:vercel'), 'README : l’ancienne voie est montrée sous le nom de script qui la désigne');
 ok(/server\.fs\.deny/.test(readme) && /Windows/.test(readme), 'README : les deux trous Windows du serveur de dev sont écrits avec leur correctif');
+ok(/framework = \*\*Vite\*\*/.test(readme), 'README : l’option Vercel nomme le framework construit (Vite), pas l’hébergeur');
 for (const s of ['npx wrangler login', 'npx wrangler deploy', 'not_found_handling', 'pages deploy', 'wrangler rollback']) {
   ok(readme.includes(s), `README : ${s}`);
 }
