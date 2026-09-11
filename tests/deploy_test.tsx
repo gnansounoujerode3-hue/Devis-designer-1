@@ -90,6 +90,28 @@ for (const m of ['og:url', 'og:image', 'twitter:image', 'canonical']) {
   const v = (html.match(re) || [])[1] || '';
   ok(v.startsWith('https://' + appHost + '/'), `index.html : « ${m} » pointe sur le domaine public`, v);
 }
+/* ---------- 2 ter. L'étude du marché ne contredit pas le produit ---------- */
+/* MARCHE.md promet des prix et un quota gratuit : ils doivent rester ceux du code.
+   Un document commercial qui dérive des constantes est le seul genre de dette qui
+   se transforme en litige avec un client. */
+ok(has('MARCHE.md'), 'MARCHE.md est dans le dépôt (les segments ne vivent pas que dans la tête du vendeur)');
+const marche = has('MARCHE.md') ? read('MARCHE.md').replace(/[\u00a0\u202f]/g, ' ') : '';
+const lic = read('src/lib/license.ts');
+const num = (src: string, name: string) => Number((src.match(new RegExp('export const ' + name + ' = (\\d+)')) || [])[1]);
+const FREE = num(lic, 'FREE_EXPORT_LIMIT'), PM = num(lic, 'PRICE_MONTHLY'), PA = num(lic, 'PRICE_ANNUAL'), PD = num(lic, 'PRICE_CUSTOM_DESIGN');
+const grp = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+ok(marche.includes('`FREE_EXPORT_LIMIT = ' + FREE + '`'), 'MARCHE.md cite le quota gratuit réel du code', 'FREE=' + FREE);
+ok(marche.includes(grp(PM) + ' F par mois'), 'MARCHE.md cite le prix mensuel réel', grp(PM) + ' F');
+ok(marche.includes(grp(PA) + ' F par an'), 'MARCHE.md cite le prix annuel réel', grp(PA) + ' F');
+ok(marche.includes(grp(PD) + ' F'), 'MARCHE.md cite le prix du design sur mesure');
+/* le revenu net affiché doit suivre la commission (15 %) telle qu'elle est écrite dans le code */
+const NET = 0.85;
+ok(marche.includes(grp(Math.round(25 * PM * NET))), 'MARCHE.md : le revenu net de 25 clients est calculé, pas recopié');
+/* et la vraie limite du produit doit rester écrite, sinon la promesse dérape */
+ok(/e-MECeF|e-mecef/.test(marche), 'MARCHE.md nomme l’obligation e-MECeF (le segment assujetti ne se vend pas comme le reste)');
+ok(!/conforme à la réglementation|remplace e-MECeF/i.test(marche), 'MARCHE.md ne revendique aucune conformité fiscale');
+for (const s2 of ['Dantokpa', 'ZIGIB', 'Sèmè City']) ok(marche.includes(s2), `MARCHE.md donne un lieu où trouver les prospects (${s2})`);
+
 const ld = (read('index.html').match(/"@type":\s*"SoftwareApplication"[\s\S]{0,400}/) || [''])[0];
 ok(ld.includes(`"url": "https://${appHost}/"`), 'index.html : le JSON-LD (SoftwareApplication) déclare la même adresse', ld.slice(0, 90));
 

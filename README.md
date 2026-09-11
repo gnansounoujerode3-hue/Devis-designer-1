@@ -9,7 +9,7 @@ mises à jour automatiques. Le site présente deux vues : une **page d'accueil p
 
 ```bash
 npm install        # installer les dépendances
-npm test           # 8 suites, 522 assertions, tout ce qui casse en silence
+npm test           # 8 suites, 533 assertions, tout ce qui casse en silence
 npm run build      # build de production (fichier unique dist/index.html)
 npm run preview    # prévisualiser le build (localhost seulement)
 npm run dev        # serveur de développement (http://localhost:5173)
@@ -334,11 +334,13 @@ Décision prise dans `src/lib/route.ts` (`resolveRoute()` est une fonction pure 
 ```
 devis-designer/
 ├── index.html          # Point d'entrée
+├── MARCHE.md           # À qui vendre : segments, volumes, canaux, test de 30 jours
 ├── package.json        # Dépendances & scripts
 ├── vite.config.ts      # Configuration Vite (fichier unique)
 ├── tsconfig.json       # TypeScript strict
 ├── public/
-│   └── og-image.png  # vignette des partages (WhatsApp, LinkedIn…) — voir « Vignette de partage »
+│   ├── og-image.png  # vignette des partages (WhatsApp, LinkedIn…) — voir « Vignette de partage »
+│   └── robots.txt    # laisse les robots d’aperçu entrer (sinon le fallback SPA leur répond du HTML)
 ├── backend/
 │   └── worker.js       # Serveur : codes d'activation, quota d'exports, parrainage (Cloudflare Worker)
 ├── scripts/
@@ -351,7 +353,7 @@ devis-designer/
 │   ├── design_test.tsx # Tout le trajet du design personnalisé (67 assertions)
 │   ├── pulse_test.tsx  # La sonde du Pulse Chariow, état par état (59 assertions)
 │   ├── workerbase_test.tsx # L'adresse du Worker, ses replis et les messages de panne (69 assertions)
-│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne, y compris les commandes, les pins et ce que voit le robot d'aperçu (76 assertions)
+│   ├── deploy_test.tsx # Ce qui casse à la mise en ligne, y compris les commandes, les pins, ce que voit le robot d'aperçu et la vérité du MARCHE.md (87 assertions)
 │   ├── payment_test.tsx # Le Worker rejoué sous Node : annulation, code unique, Pulse (45 assertions)
 │   ├── services_test.tsx # Le carnet de prestations et les astérisques du paiement (65 assertions)
 │   ├── emitter_test.tsx # Le carnet d'émetteurs, la numérotation et le callback (61 assertions)
@@ -377,6 +379,11 @@ devis-designer/
 ```
 
 ## 💰 Monétisation
+
+> À qui tout ça est destiné : segmentation, volumes réels par métier, canaux de prospection et
+> test de validation sur 30 jours — dans **[`MARCHE.md`](MARCHE.md)**, tenu au même niveau d'exigence
+> que le code : les prix et le quota gratuit de ce document sont **vérifiés contre les constantes**
+> par `npm test`.
 
 | Offre | Prix | Effet |
 |---|---|---|
@@ -701,7 +708,7 @@ l'ancienne adresse est en ligne, elle doit afficher le même message de transiti
 **Incrémentez `APP_VERSION` à chaque publication** (et la `version` de
 `backend/worker.js` quand vous changez le Worker) : après déploiement, rechargez en dur
 (Ctrl+Maj+R) et lisez le numéro — s'il n'a pas bougé, c'est l'ancien bundle (cache
-browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 522 assertions
+browser/Netlify, ou mauvais dossier envoyé). `npm test` est là aussi : 533 assertions
 vertes avant de pousser, dont les textes de la page d'accueil, des CGU, du `index.html` et la
 cohérence de l'hébergement (domaine public unique, `wrangler.jsonc`).
 
