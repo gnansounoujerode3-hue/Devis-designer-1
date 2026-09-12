@@ -112,6 +112,35 @@ ok(/e-MECeF|e-mecef/.test(marche), 'MARCHE.md nomme l’obligation e-MECeF (le s
 ok(!/conforme à la réglementation|remplace e-MECeF/i.test(marche), 'MARCHE.md ne revendique aucune conformité fiscale');
 for (const s2 of ['Dantokpa', 'ZIGIB', 'Sèmè City']) ok(marche.includes(s2), `MARCHE.md donne un lieu où trouver les prospects (${s2})`);
 
+/* ---------- 2 quater. Le plan de prospection à 0 F dit la vérité sur le produit ---------- */
+/* PROSPECTION.md est fait pour être copié-collé tel quel dans une conversation WhatsApp :
+   c'est le document le plus dangereux du dépôt, parce qu'une promesse fausse y part
+   chez 200 prospects en une semaine. Les prix, le seuil et les limites du produit doivent
+   rester ceux du code. */
+ok(has('PROSPECTION.md'), 'PROSPECTION.md est dans le dépôt (le plan à 0 F est écrit, pas dans la tête du vendeur)');
+const prosp = has('PROSPECTION.md') ? read('PROSPECTION.md').replace(/[\u00a0\u202f]/g, ' ') : '';
+const PALL = num(lic, 'PRICE_ALL');
+ok(prosp.includes(FREE + ' documents par mois'), 'PROSPECTION.md : le seuil gratuit cité est celui du code (' + FREE + ')');
+ok(prosp.includes(grp(PM) + ' F par mois'), 'PROSPECTION.md cite le prix mensuel réel');
+ok(prosp.includes(grp(PA) + ' F par an'), 'PROSPECTION.md cite le prix annuel réel');
+ok(prosp.includes(grp(PD) + ' F le design'), 'PROSPECTION.md cite le prix du design sur mesure');
+ok(prosp.includes(grp(PALL) + ' F tous les designs'), 'PROSPECTION.md cite la quatrième offre (tous les designs)');
+ok(/e-MECeF/.test(prosp), 'PROSPECTION.md nomme e-MECeF : la limite du produit est dite au prospect');
+/* Le document cite les phrases interdites POUR LES INTERDIRE : on ne teste donc que ce
+   qu'il affirme hors guillemets. Un test d'absence sur le texte brut serait trompé par
+   la liste des prohibitions elle-même. */
+const prosq = prosp.replace(/«[^»]*»/g, '');
+ok(!/conforme à la réglementation|remplace e-MECeF|acceptée par les impôts/i.test(prosq),
+   "PROSPECTION.md n’affirme aucune conformité fiscale : les occurrences sont entre guillemets, comme prohibitions");
+ok(prosp.includes("n'est que le secours"), 'PROSPECTION.md : la caisse reste Chariow, le numéro du vendeur ne sert qu en secours');
+ok(prosp.includes('15 messages personnels'), 'PROSPECTION.md borne le volume quotidien (au-delà, le compte WhatsApp est restreint)');
+ok(prosp.includes('#/vendeur'), 'PROSPECTION.md renvoie aux codes émis à la main (promo, accord revendeur)');
+ok(/plafond 12 mois|12 mois par an/.test(prosp), 'PROSPECTION.md énonce le vrai plafond de parrainage');
+const rdm = read('README.md');
+for (const t of ['\u251c\u2500\u2500 MARCHE.md', '\u251c\u2500\u2500 PROSPECTION.md', 'robots.txt']) {
+  ok(rdm.includes(t), "README.md : l'arborescence cite " + t.replace(/^\S+ /, ''));
+}
+
 const ld = (read('index.html').match(/"@type":\s*"SoftwareApplication"[\s\S]{0,400}/) || [''])[0];
 ok(ld.includes(`"url": "https://${appHost}/"`), 'index.html : le JSON-LD (SoftwareApplication) déclare la même adresse', ld.slice(0, 90));
 
